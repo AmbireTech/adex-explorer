@@ -40,8 +40,7 @@ struct MarketChannel {
 // Model
 #[derive(Default)]
 struct Model {
-    pub is_loading: bool,
-    pub channels: Vec<MarketChannel>,
+    pub channels: Option<Vec<MarketChannel>>,
 }
 
 
@@ -56,7 +55,6 @@ enum Msg {
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
     match msg {
         Msg::LoadCampaigns => {
-            model.is_loading = true;
             let order = Request::new(MARKET_URL)
                 .method(Method::Get)
                 .fetch_json()
@@ -64,10 +62,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
                 .map_err(Msg::OnFetchErr);
             orders.skip().perform_cmd(order);
         },
-        Msg::ChannelsLoaded(channels) => {
-            model.is_loading = false;
-            model.channels = channels;
-        },
+        Msg::ChannelsLoaded(channels) => { model.channels = Some(channels) },
         // @TODO handle this
         Msg::OnFetchErr(_) => (), 
     }
@@ -76,12 +71,12 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 
 // View
 fn view(model: &Model) -> El<Msg> {
-    if model.is_loading {
-        return h1!["Loading..."]
-    }
+    let channels = match &model.channels {
+        None => return h1!["Loading..."],
+        Some(c) => c
+    };
 
-    let total_dai: BigUint = model
-        .channels
+    let total_dai: BigUint = channels
         .iter()
         .filter_map(|MarketChannel { deposit_asset, deposit_amount, .. }|
             if deposit_asset == DAI_ADDR { Some(&deposit_amount.0) } else { None }
@@ -90,7 +85,7 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         h3![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
-        table![view_channel_table(&model.channels)]
+        table![view_channel_table(&channels)]
     ]
 }
 
