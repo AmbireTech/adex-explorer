@@ -21,12 +21,18 @@ pub enum MarketStatusType { Initializing, Ready, Active, Offline, Disconnected, 
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
+struct Spec {
+    min_per_impression: BigNum
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all="camelCase")]
 struct MarketStatus {
     #[serde(rename="name")]
     pub status_type: MarketStatusType,
     pub usd_estimate: f32,
     #[serde(rename="lastApprovedBalances")]
-    pub balances: HashMap<String, BigNum>
+    pub balances: HashMap<String, BigNum>,
 }
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
@@ -34,7 +40,8 @@ struct MarketChannel {
     pub id: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
-    pub status: MarketStatus
+    pub status: MarketStatus,
+    pub spec: Spec,
 }
 
 // Model
@@ -77,9 +84,13 @@ fn view(model: &Model) -> El<Msg> {
         Some(c) => c
     };
 
+    let total_impressions: BigUint = channels
+        .iter()
+        .map(|x| &x.deposit_amount.0 / &x.spec.min_per_impression.0)
+        .sum();
+
     // @TODO we can make a special type for DAI channels and that way shield ourselves of 
     // rendering wrongly
-
     let mut channels_dai: Vec<MarketChannel> = channels
         .iter()
         .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR)
@@ -96,6 +107,7 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         h3![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
+        h3![format!("Total impressions: {}", &total_impressions)],
         table![view_channel_table(&channels_dai)]
     ]
 }
