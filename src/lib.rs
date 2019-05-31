@@ -81,7 +81,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 // View
 fn view(model: &Model) -> El<Msg> {
     let channels = match &model.channels {
-        None => return h1!["Loading..."],
+        None => return h2!["Loading..."],
         Some(c) => c
     };
 
@@ -107,8 +107,11 @@ fn view(model: &Model) -> El<Msg> {
         .sum();
 
     div![
-        h3![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
-        h3![format!("Total impressions: {}", total_impressions.to_formatted_string(&Locale::en))],
+        h2![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
+        h2![
+            //attrs!{ At::Class => "impressions-rainbow" },
+            format!("Total impressions: {}", total_impressions.to_formatted_string(&Locale::en))
+        ],
         table![view_channel_table(&channels_dai)]
     ]
 }

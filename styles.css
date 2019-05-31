@@ -1,3 +1,11 @@
+h2.impressions-rainbow {
+  background: linear-gradient(to right, orange , yellow, green, cyan, blue, violet);
+  background-clip: border-box;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 55px;
+  display: inline-block;
+}
 body {
   font-family: Arial;
 }
