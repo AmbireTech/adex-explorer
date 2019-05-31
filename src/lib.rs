@@ -1,7 +1,21 @@
 #[macro_use]
 extern crate seed;
 use seed::prelude::*;
+use serde::Deserialize;
+use seed::{Method, Request};
+use futures::Future;
 
+mod bignum;
+use bignum::*;
+
+const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
+
+// Channel stuff
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all="camelCase")]
+struct MarketChannel {
+    pub deposit_amount: BigNum
+}
 
 // Model
 
@@ -22,18 +36,30 @@ impl Default for Model {
 
 #[derive(Clone)]
 enum Msg {
+    LoadCampaigns,
+    CampaignsLoaded(Vec<MarketChannel>),
+    OnFetchErr(JsValue),
     Increment,
 }
 
-fn update(msg: Msg, model: &mut Model, _: &mut Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
     match msg {
+        Msg::LoadCampaigns => {
+            let order = Request::new(MARKET_URL)
+                .method(Method::Get)
+                .fetch_json()
+                .map(Msg::CampaignsLoaded)
+                .map_err(Msg::OnFetchErr);
+            orders.skip().perform_cmd(order);
+        },
+        Msg::CampaignsLoaded(campaigns) => log!(format!("campaigns: {:?}", &campaigns)), // @TODO
+        Msg::OnFetchErr(_) => (), // @TODO
         Msg::Increment => model.val += 1,
     }
 }
 
 
 // View
-
 fn view(model: &Model) -> El<Msg> {
     button![
         simple_ev(Ev::Click, Msg::Increment),
@@ -43,8 +69,9 @@ fn view(model: &Model) -> El<Msg> {
 
 #[wasm_bindgen]
 pub fn render() {
-    seed::App::build(Model::default(), update, view)
+    let state = seed::App::build(Model::default(), update, view)
         .finish()
         .run();
 
+    state.update(Msg::LoadCampaigns);
 }
