@@ -92,7 +92,9 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
     let header = tr![
         td!["USD estimate"],
         td!["Deposit"],
-        td!["Paid"]
+        td!["Paid"],
+        td!["Paid - %"],
+        td!["Status"]
     ];
 
     std::iter::once(header)
@@ -101,11 +103,16 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
 }
 
 fn view_channel(channel: &MarketChannel) -> El<Msg> {
-    let total_paid = channel.status.balances.iter().map(|(_, v)| &v.0).sum();
+    let paid_total = channel.status.balances.iter().map(|(_, v)| &v.0).sum();
+    //let paid_ratio = paid_total.mul(&10000.into()).div_floor(channel.deposit_amount.0);
+    //let paid_ratio = paid_ratio.to_f64().unwrap_or(10000.0) / 100.0;
     tr![
         td![format!("${:.2}", &channel.status.usd_estimate)],
         td![dai_readable(&channel.deposit_amount.0)],
-        td![dai_readable(&total_paid)]
+        td![dai_readable(&paid_total)],
+        //td![format!("{:.2}%", &paid_ratio)]
+        td!["0.00"],
+        td![format!("{:?}", &channel.status.status_type)]
     ]
 }
 fn dai_readable(bal: &BigUint) -> String {
