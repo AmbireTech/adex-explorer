@@ -31,6 +31,7 @@ struct MarketStatus {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
 struct MarketChannel {
+    pub id: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
     pub status: MarketStatus
@@ -103,22 +104,27 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
 }
 
 fn view_channel(channel: &MarketChannel) -> El<Msg> {
+    let deposit_amount = &channel.deposit_amount.0;
     let paid_total = channel.status.balances.iter().map(|(_, v)| &v.0).sum();
-    //let paid_ratio = paid_total.mul(&10000.into()).div_floor(channel.deposit_amount.0);
-    //let paid_ratio = paid_ratio.to_f64().unwrap_or(10000.0) / 100.0;
+    //let url = format!("{}/channel/{}", ); @TODO when validators
     tr![
+        //td![a![attrs!{At::Href => }, ]]
         td![format!("${:.2}", &channel.status.usd_estimate)],
-        td![dai_readable(&channel.deposit_amount.0)],
+        td![dai_readable(&deposit_amount)],
         td![dai_readable(&paid_total)],
-        //td![format!("{:.2}%", &paid_ratio)]
-        td!["0.00"],
+        td![{
+            let base = 100000u32;
+            let paid_units = (paid_total * base).div_floor(deposit_amount);
+            let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
+            format!("{:.3}%", paid_hundreds)
+        }],
         td![format!("{:?}", &channel.status.status_type)]
     ]
 }
 fn dai_readable(bal: &BigUint) -> String {
     // 10 ** 16
     match bal.div_floor(&10_000_000_000_000_000u64.into()).to_f64() {
-        Some(hundreds) => format!("{:.2}", hundreds / 100.0),
+        Some(hundreds) => format!("{:.2} DAI", hundreds / 100.0),
         None => ">max".to_owned()
     }
 }
