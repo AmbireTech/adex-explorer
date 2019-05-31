@@ -40,6 +40,7 @@ struct MarketChannel {
 // Model
 #[derive(Default)]
 struct Model {
+    pub is_loading: bool,
     pub channels: Vec<MarketChannel>,
 }
 
@@ -55,6 +56,7 @@ enum Msg {
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
     match msg {
         Msg::LoadCampaigns => {
+            model.is_loading = true;
             let order = Request::new(MARKET_URL)
                 .method(Method::Get)
                 .fetch_json()
@@ -62,7 +64,10 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
                 .map_err(Msg::OnFetchErr);
             orders.skip().perform_cmd(order);
         },
-        Msg::ChannelsLoaded(channels) => { model.channels = channels },
+        Msg::ChannelsLoaded(channels) => {
+            model.is_loading = false;
+            model.channels = channels;
+        },
         // @TODO handle this
         Msg::OnFetchErr(_) => (), 
     }
@@ -71,6 +76,10 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 
 // View
 fn view(model: &Model) -> El<Msg> {
+    if model.is_loading {
+        return h1!["Loading..."]
+    }
+
     let total_dai: BigUint = model
         .channels
         .iter()
