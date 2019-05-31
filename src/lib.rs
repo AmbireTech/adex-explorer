@@ -7,6 +7,7 @@ use futures::Future;
 use num::integer::Integer;
 use num::bigint::BigUint;
 use num::traits::ToPrimitive;
+use std::collections::HashMap;
 
 mod bignum;
 use bignum::*;
@@ -24,6 +25,8 @@ struct MarketStatus {
     #[serde(rename="name")]
     pub status_type: MarketStatusType,
     pub usd_estimate: f32,
+    #[serde(rename="lastApprovedBalances")]
+    pub balances: HashMap<String, BigNum>
 }
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
@@ -59,7 +62,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip().perform_cmd(order);
         },
         Msg::ChannelsLoaded(channels) => { model.channels = channels },
-        Msg::OnFetchErr(_) => (), // @TODO handle this
+        // @TODO handle this
+        Msg::OnFetchErr(_) => (), 
     }
 }
 
@@ -79,6 +83,7 @@ fn view(model: &Model) -> El<Msg> {
         table![view_channel_table(&model.channels)]
     ]
 }
+
 fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
     let rows = channels
         .iter()
@@ -86,17 +91,21 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
 
     let header = tr![
         td!["USD estimate"],
-        td!["DAI"]
+        td!["Deposit"],
+        td!["Paid"]
     ];
 
     std::iter::once(header)
         .chain(rows)
         .collect::<Vec<El<Msg>>>()
 }
+
 fn view_channel(channel: &MarketChannel) -> El<Msg> {
+    let total_paid = channel.status.balances.iter().map(|(_, v)| &v.0).sum();
     tr![
-        td![format!("{:.2}", &channel.status.usd_estimate)],
-        td![dai_readable(&channel.deposit_amount.0)]
+        td![format!("${:.2}", &channel.status.usd_estimate)],
+        td![dai_readable(&channel.deposit_amount.0)],
+        td![dai_readable(&total_paid)]
     ]
 }
 fn dai_readable(bal: &BigUint) -> String {
