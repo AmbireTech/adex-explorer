@@ -69,6 +69,7 @@ enum Msg {
     LoadCampaigns,
     ChannelsLoaded(Vec<MarketChannel>),
     OnFetchErr(JsValue),
+    SortSelected(String),
 }
 
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
@@ -83,7 +84,14 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
         },
         Msg::ChannelsLoaded(channels) => { model.channels = Loadable::Ready(channels) },
         // @TODO handle this
-        Msg::OnFetchErr(_) => (), 
+        Msg::OnFetchErr(_) => (),
+        Msg::SortSelected(sort_name) => {
+            match &sort_name as &str {
+                "deposit" => model.sort = ChannelSort::Deposit,
+                "status" => model.sort = ChannelSort::Status,
+                _ => (),
+            }
+        }
     }
 }
 
@@ -108,8 +116,16 @@ fn view(model: &Model) -> El<Msg> {
         .cloned()
         .collect();
 
-    channels_dai
-        .sort_by(|x, y| y.deposit_amount.0.cmp(&x.deposit_amount.0));
+    match model.sort {
+        ChannelSort::Deposit => {
+            channels_dai
+                .sort_by(|x, y| y.deposit_amount.0.cmp(&x.deposit_amount.0));
+        },
+        ChannelSort::Status => {
+            channels_dai
+                .sort_by_key(|x| x.status.status_type.clone())
+        }
+    }
 
     let total_dai: BigUint = channels_dai
         .iter()
@@ -121,6 +137,12 @@ fn view(model: &Model) -> El<Msg> {
         h2![
             //attrs!{ At::Class => "impressions-rainbow" },
             format!("Total impressions: {}", total_impressions.to_formatted_string(&Locale::en))
+        ],
+        select![
+            attrs!{At::Value => "deposit"},
+            option![attrs!{At::Value => "deposit"}, "Sort by deposit"],
+            option![attrs!{At::Value => "status"}, "Sort by status"],
+            input_ev(Ev::Input, Msg::SortSelected)
         ],
         table![view_channel_table(&channels_dai)]
     ]
