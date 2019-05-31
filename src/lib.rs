@@ -41,6 +41,7 @@ struct MarketChannel {
 #[derive(Default)]
 struct Model {
     pub channels: Option<Vec<MarketChannel>>,
+    //pub sort: Sort,
 }
 
 
@@ -79,11 +80,14 @@ fn view(model: &Model) -> El<Msg> {
     // @TODO we can make a special type for DAI channels and that way shield ourselves of 
     // rendering wrongly
 
-    let channels_dai: Vec<MarketChannel> = channels
+    let mut channels_dai: Vec<MarketChannel> = channels
         .iter()
         .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR)
         .cloned()
         .collect();
+
+    channels_dai
+        .sort_by(|x, y| y.deposit_amount.0.cmp(&x.deposit_amount.0));
 
     let total_dai: BigUint = channels_dai
         .iter()
