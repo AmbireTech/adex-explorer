@@ -9,6 +9,8 @@ use num::bigint::BigUint;
 use num::traits::ToPrimitive;
 use std::collections::HashMap;
 use num_format::{Locale, ToFormattedString};
+use chrono::serde::ts_milliseconds;
+use chrono::{DateTime, Utc};
 
 mod bignum;
 use bignum::*;
@@ -35,6 +37,8 @@ struct MarketStatus {
     pub usd_estimate: f32,
     #[serde(rename="lastApprovedBalances")]
     pub balances: HashMap<String, BigNum>,
+    #[serde(with = "ts_milliseconds")]
+    pub last_checked: DateTime<Utc>,
 }
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
@@ -158,7 +162,8 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         td!["Deposit"],
         td!["Paid"],
         td!["Paid - %"],
-        td!["Status"]
+        td!["Status"],
+        td!["Last updated"],
     ];
 
     std::iter::once(header)
@@ -181,7 +186,18 @@ fn view_channel(channel: &MarketChannel) -> El<Msg> {
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
         }],
-        td![format!("{:?}", &channel.status.status_type)]
+        td![format!("{:?}", &channel.status.status_type)],
+        td![{
+            let last_checked = &channel.status.last_checked;
+            /*
+            let time_diff = last_checked.signed_duration_since(Utc::now());
+            match time_diff.num_seconds() {
+                x @ 0..=59 => format!("{} seconds ago", x),
+                x @ 60..=3600 => format!("{} minutes ago", x/60),
+                _ => format!("{}", last_checked.format("%Y-%m-%d"))
+            }*/
+            format!("{}", last_checked.format("%Y-%m-%d"))
+        }]
     ]
 }
 fn dai_readable(bal: &BigUint) -> String {
