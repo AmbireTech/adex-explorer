@@ -8,6 +8,7 @@ use num::integer::Integer;
 use num::bigint::BigUint;
 use num::traits::ToPrimitive;
 use std::collections::HashMap;
+use num_format::{Locale, ToFormattedString};
 
 mod bignum;
 use bignum::*;
@@ -84,9 +85,9 @@ fn view(model: &Model) -> El<Msg> {
         Some(c) => c
     };
 
-    let total_impressions: BigUint = channels
+    let total_impressions: u64 = channels
         .iter()
-        .map(|x| &x.deposit_amount.0 / &x.spec.min_per_impression.0)
+        .map(|x| (&x.deposit_amount.0 / &x.spec.min_per_impression.0).to_u64().unwrap_or(0))
         .sum();
 
     // @TODO we can make a special type for DAI channels and that way shield ourselves of 
@@ -107,7 +108,7 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         h3![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
-        h3![format!("Total impressions: {}", &total_impressions)],
+        h3![format!("Total impressions: {}", total_impressions.to_formatted_string(&Locale::en))],
         table![view_channel_table(&channels_dai)]
     ]
 }
