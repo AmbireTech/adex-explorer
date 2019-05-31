@@ -66,7 +66,6 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 
 // View
 fn view(model: &Model) -> El<Msg> {
-    log!(format!("{:?}", &model.channels));
     let total_dai: BigUint = model
         .channels
         .iter()
