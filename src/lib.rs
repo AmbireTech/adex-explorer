@@ -85,12 +85,12 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         .iter()
         .map(view_channel);
 
-    let header = Some(tr![
+    let header = tr![
         td!["USD estimate"],
         td!["DAI"]
-    ]).into_iter();
+    ];
 
-    header
+    std::iter::once(header)
         .chain(rows)
         .collect::<Vec<El<Msg>>>()
 }
