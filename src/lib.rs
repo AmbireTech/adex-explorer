@@ -14,6 +14,7 @@ const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
 struct MarketChannel {
+    pub deposit_asset: String,
     pub deposit_amount: BigNum
 }
 
@@ -52,7 +53,14 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
                 .map_err(Msg::OnFetchErr);
             orders.skip().perform_cmd(order);
         },
-        Msg::CampaignsLoaded(campaigns) => log!(format!("campaigns: {:?}", &campaigns)), // @TODO
+        Msg::CampaignsLoaded(campaigns) => {
+            let total: num_bigint::BigUint = campaigns
+                .iter()
+                .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
+                .sum();
+
+            log!(format!("campaigns: {:?}", &campaigns));
+        },
         Msg::OnFetchErr(_) => (), // @TODO
         Msg::Increment => model.val += 1,
     }
