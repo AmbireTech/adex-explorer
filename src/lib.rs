@@ -17,7 +17,8 @@ const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 
 // Data structs specific to the market
-#[derive(Deserialize, Clone, Debug)]
+// @TODO use domain
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MarketStatusType { Initializing, Ready, Active, Offline, Disconnected, Unhealthy, Withdraw, Expired, Exhausted }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -46,10 +47,19 @@ struct MarketChannel {
 }
 
 // Model
-#[derive(Default)]
+enum Loadable<T> { Loading, Ready(T) }
+enum ChannelSort { Deposit, Status }
 struct Model {
-    pub channels: Option<Vec<MarketChannel>>,
-    //pub sort: Sort,
+    pub channels: Loadable<Vec<MarketChannel>>,
+    pub sort: ChannelSort,
+}
+impl Default for Model {
+    fn default() -> Self {
+        Model {
+            channels: Loadable::Loading,
+            sort: ChannelSort::Deposit,
+        }
+    }
 }
 
 
@@ -71,7 +81,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
                 .map_err(Msg::OnFetchErr);
             orders.skip().perform_cmd(order);
         },
-        Msg::ChannelsLoaded(channels) => { model.channels = Some(channels) },
+        Msg::ChannelsLoaded(channels) => { model.channels = Loadable::Ready(channels) },
         // @TODO handle this
         Msg::OnFetchErr(_) => (), 
     }
@@ -81,8 +91,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 // View
 fn view(model: &Model) -> El<Msg> {
     let channels = match &model.channels {
-        None => return h2!["Loading..."],
-        Some(c) => c
+        Loadable::Loading => return h2!["Loading..."],
+        Loadable::Ready(c) => c
     };
 
     let total_impressions: u64 = channels
