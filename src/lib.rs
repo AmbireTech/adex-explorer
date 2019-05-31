@@ -76,16 +76,23 @@ fn view(model: &Model) -> El<Msg> {
         Some(c) => c
     };
 
-    let total_dai: BigUint = channels
+    // @TODO we can make a special type for DAI channels and that way shield ourselves of 
+    // rendering wrongly
+
+    let channels_dai: Vec<MarketChannel> = channels
         .iter()
-        .filter_map(|MarketChannel { deposit_asset, deposit_amount, .. }|
-            if deposit_asset == DAI_ADDR { Some(&deposit_amount.0) } else { None }
-        )
+        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR)
+        .cloned()
+        .collect();
+
+    let total_dai: BigUint = channels_dai
+        .iter()
+        .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
         .sum();
 
     div![
         h3![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
-        table![view_channel_table(&channels)]
+        table![view_channel_table(&channels_dai)]
     ]
 }
 
