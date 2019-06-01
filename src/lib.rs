@@ -28,7 +28,7 @@ use bignum::*;
 
 const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
-const UPDATE_MS: i32 = 30000;
+const UPDATE_MS: i32 = 10000;
 
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -167,6 +167,8 @@ fn view(model: &Model) -> El<Msg> {
         .sum();
 
     div![
+        h2![format!("Total campaigns: {}", channels.len())],
+        h2![format!("Total ad units: {}", channels.iter().map(|x| x.spec.ad_units.len()).sum::<usize>())],
         h2![format!(
             "Total campaign deposits: {}",
             dai_readable(&total_deposit)
