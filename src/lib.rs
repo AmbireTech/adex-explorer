@@ -180,6 +180,7 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         .map(view_channel);
 
     let header = tr![
+        td!["URL"],
         td!["USD estimate"],
         td!["Deposit"],
         td!["Paid"],
@@ -196,9 +197,10 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
 fn view_channel(channel: &MarketChannel) -> El<Msg> {
     let deposit_amount = &channel.deposit_amount.0;
     let paid_total = channel.status.balances_sum();
-    //let url = format!("{}/channel/{}", ); @TODO when validators
+    let url = format!("{}/channel/{}/status", channel.spec.validators.get(0).map_or("", |v| &v.url), channel.id);
+    let id_prefix = channel.id.chars().take(6).collect::<String>();
     tr![
-        //td![a![attrs!{At::Href => }, ]]
+        td![a![attrs!{At::Href => url; At::Target => "_blank"}, id_prefix]],
         td![format!("${:.2}", &channel.status.usd_estimate)],
         td![dai_readable(&deposit_amount)],
         td![dai_readable(&paid_total)],
