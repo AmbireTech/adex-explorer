@@ -9,8 +9,19 @@ use num::bigint::BigUint;
 use num::traits::ToPrimitive;
 use std::collections::HashMap;
 use num_format::{Locale, ToFormattedString};
-use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
+use chrono::serde::ts_milliseconds;
+
+mod ad_unit;
+use ad_unit::*;
+mod targeting_tag;
+use targeting_tag::*;
+mod validator;
+use validator::*;
+mod event_submission;
+use event_submission::*;
+mod channel;
+use channel::*;
 
 mod bignum;
 use bignum::*;
@@ -20,7 +31,6 @@ const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const UPDATE_MS: i32 = 30000;
 
 // Data structs specific to the market
-// @TODO use domain
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MarketStatusType { Initializing, Ready, Active, Offline, Disconnected, Unhealthy, Withdraw, Expired, Exhausted }
 
@@ -53,7 +63,7 @@ struct MarketChannel {
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
     pub status: MarketStatus,
-    pub spec: Spec,
+    pub spec: ChannelSpec,
 }
 
 // Model
