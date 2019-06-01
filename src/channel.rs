@@ -1,10 +1,9 @@
-
-use chrono::{DateTime, Utc};
 use chrono::serde::{ts_milliseconds, ts_seconds};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc};
 use crate::bignum::BigNum;
+use crate::{AdUnit, EventSubmission, TargetingTag, ValidatorDesc};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
