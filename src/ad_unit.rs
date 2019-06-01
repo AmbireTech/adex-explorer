@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use chrono::serde::ts_milliseconds;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::TargetingTag;
@@ -47,5 +47,4 @@ pub struct AdUnit {
     // UTC timestamp in milliseconds, changed every time modifiable property is changed
     //#[serde(default, with = "ts_milliseconds_option")]
     //modified: Option<DateTime<Utc>>,
-
 }
