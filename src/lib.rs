@@ -17,6 +17,7 @@ use bignum::*;
 
 const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
+const UPDATE_MS: i32 = 30000;
 
 // Data structs specific to the market
 // @TODO use domain
@@ -215,4 +216,5 @@ pub fn render() {
         .run();
 
     state.update(Msg::LoadCampaigns);
+    seed::set_interval(Box::new(move || state.update(Msg::LoadCampaigns)), UPDATE_MS);
 }
