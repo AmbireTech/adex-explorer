@@ -238,7 +238,7 @@ fn view_channel(channel: &MarketChannel) -> El<Msg> {
                 x if x < 0 => format!("just now"),
                 x if x < 60 => format!("{} seconds ago", x),
                 x if x < 3600 => format!("{} minutes ago", x / 60),
-                _ => format!("{}", channel.status.last_checked.format("%Y-%m-%d")),
+                _ => format!("{}", channel.status.last_checked.format("%Y-%m-%d %T")),
             }
         }]
     ]
