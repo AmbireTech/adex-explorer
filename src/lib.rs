@@ -233,14 +233,13 @@ fn view_channel(channel: &MarketChannel) -> El<Msg> {
         td![format!("{:?}", &channel.status.status_type)],
         td![{
             let last_checked = &channel.status.last_checked.timestamp();
-            let time_diff = (js_sys::Date::now() as i64)/1000 - last_checked;
+            let time_diff = (js_sys::Date::now() as i64) / 1000 - last_checked;
             match time_diff {
                 x if x < 0 => format!("just now"),
                 x if x < 60 => format!("{} seconds ago", x),
-                x if x < 3600 => format!("{} minutes ago", x/60),
-                _ => format!("{}", channel.status.last_checked.format("%Y-%m-%d"))
+                x if x < 3600 => format!("{} minutes ago", x / 60),
+                _ => format!("{}", channel.status.last_checked.format("%Y-%m-%d")),
             }
-            //format!("{}", last_checked.format("%Y-%m-%d"))
         }]
     ]
 }
