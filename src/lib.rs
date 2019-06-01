@@ -41,6 +41,11 @@ struct MarketStatus {
     #[serde(with = "ts_milliseconds")]
     pub last_checked: DateTime<Utc>,
 }
+impl MarketStatus {
+    fn balances_sum(&self) -> BigUint {
+        self.balances.iter().map(|(_, v)| &v.0).sum()
+    }
+}
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
 struct MarketChannel {
@@ -110,7 +115,7 @@ fn view(model: &Model) -> El<Msg> {
 
     let total_impressions: u64 = channels
         .iter()
-        .map(|x| (&x.deposit_amount.0 / &x.spec.min_per_impression.0).to_u64().unwrap_or(0))
+        .map(|x| (&x.status.balances_sum() / &x.spec.min_per_impression.0).to_u64().unwrap_or(0))
         .sum();
 
     // @TODO we can make a special type for DAI channels and that way shield ourselves of 
@@ -174,7 +179,7 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
 
 fn view_channel(channel: &MarketChannel) -> El<Msg> {
     let deposit_amount = &channel.deposit_amount.0;
-    let paid_total = channel.status.balances.iter().map(|(_, v)| &v.0).sum();
+    let paid_total = channel.status.balances_sum();
     //let url = format!("{}/channel/{}", ); @TODO when validators
     tr![
         //td![a![attrs!{At::Href => }, ]]
