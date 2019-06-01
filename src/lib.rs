@@ -126,6 +126,11 @@ fn view(model: &Model) -> El<Msg> {
         .cloned()
         .collect();
 
+    let total_paid: BigUint = channels_dai
+        .iter()
+        .map(|x| x.status.balances_sum())
+        .sum();
+
     match model.sort {
         ChannelSort::Deposit => {
             channels_dai
@@ -137,13 +142,14 @@ fn view(model: &Model) -> El<Msg> {
         }
     }
 
-    let total_dai: BigUint = channels_dai
+    let total_deposit: BigUint = channels_dai
         .iter()
         .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
         .sum();
 
     div![
-        h2![format!("Total DAI on campaigns: {}", dai_readable(&total_dai))],
+        h2![format!("Total campaign deposits: {}", dai_readable(&total_deposit))],
+        h2![format!("Total paid: {}", dai_readable(&total_paid))],
         h2![
             //attrs!{ At::Class => "impressions-rainbow" },
             format!("Total impressions: {}", total_impressions.to_formatted_string(&Locale::en))
