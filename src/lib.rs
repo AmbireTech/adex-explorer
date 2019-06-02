@@ -256,13 +256,15 @@ fn view(model: &Model) -> El<Msg> {
             "Impressions",
             &total_impressions.to_formatted_string(&Locale::en)
         ),
-        select![
-            attrs! {At::Value => "deposit"},
-            option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
-            option![attrs! {At::Value => "status"}, "Sort by status"],
-            input_ev(Ev::Input, Msg::SortSelected)
-        ],
-        table![channel_table(&channels_dai)]
+        div![
+            select![
+                attrs! {At::Value => "deposit"},
+                option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
+                option![attrs! {At::Value => "status"}, "Sort by status"],
+                input_ev(Ev::Input, Msg::SortSelected)
+            ],
+            table![channel_table(&channels_dai)]
+        ]
     ]
 }
 

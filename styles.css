@@ -23,11 +23,17 @@ table tr.full {
   background-color: rgb(20, 220, 157);
 }
 .card {
-  background-color: #eee;
+  background-color: #efefef;
+  padding: 1em;
+  margin: 0.5em;
+  display: inline-block;
+  font-weight: bold;
+  color: rgb(27, 117, 188);
 }
 .card-label {
   font-size: 1em;
 }
 .card-value {
-  font-size; 2em;
+  color: rgb(0, 49, 89);
+  font-size: 2em;
 }
