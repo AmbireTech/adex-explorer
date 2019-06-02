@@ -22,3 +22,12 @@ a {
 table tr.full {
   background-color: rgb(20, 220, 157);
 }
+.card {
+  background-color: #eee;
+}
+.card-label {
+  font-size: 1em;
+}
+.card-value {
+  font-size; 2em;
+}

@@ -243,25 +243,19 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         match &model.balance {
-            Loadable::Ready(resp) => h2![format!("Locked up on-chain: {}", dai_readable(&resp.result.0))],
+            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result.0)),
             _ => seed::empty()
         },
-        h2![format!("Total campaigns: {}", channels.len())],
-        h2![format!("Total ad units: {}", channels.iter().map(|x| x.spec.ad_units.len()).sum::<usize>())],
-        h2![format!(
-            "Total campaign deposits: {}",
-            dai_readable(&total_deposit)
-        )],
-        h2![format!("Total paid: {}", dai_readable(&total_paid))],
-        h2![
-            //attrs!{ At::Class => "impressions-rainbow" },
-            // @TODO warn that this is an estimation; add a question mark next to it
-            // to explain what an estimation means
-            format!(
-                "Total impressions: {}",
-                total_impressions.to_formatted_string(&Locale::en)
-            )
-        ],
+        card("Campaigns", &channels.len().to_string()),
+        card("Ad units", &channels.iter().map(|x| x.spec.ad_units.len()).sum::<usize>().to_string()),
+        card("Total campaign deposits", &dai_readable(&total_deposit)),
+        card("Paid out", &dai_readable(&total_paid)),
+        // @TODO warn that this is an estimation; add a question mark next to it
+        // to explain what an estimation means
+        card(
+            "Impressions",
+            &total_impressions.to_formatted_string(&Locale::en)
+        ),
         select![
             attrs! {At::Value => "deposit"},
             option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
@@ -269,6 +263,14 @@ fn view(model: &Model) -> El<Msg> {
             input_ev(Ev::Input, Msg::SortSelected)
         ],
         table![channel_table(&channels_dai)]
+    ]
+}
+
+fn card(label: &str, value: &str) -> El<Msg> {
+    div![
+        class!["card"],
+        div![class!["card-value"], value],
+        div![class!["card-label"], label],
     ]
 }
 
