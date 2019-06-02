@@ -50,12 +50,6 @@ pub enum MarketStatusType {
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-struct Spec {
-    min_per_impression: BigNum,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 struct MarketStatus {
     #[serde(rename = "name")]
     pub status_type: MarketStatusType,
