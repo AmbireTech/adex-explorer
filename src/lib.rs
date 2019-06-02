@@ -31,7 +31,7 @@ const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
-const UPDATE_MS: i32 = 10000;
+const REFRESH_MS: i32 = 10000;
 
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -111,10 +111,50 @@ impl Default for Model {
 
 // Update
 #[derive(Clone)]
+enum ActionLoad {
+    // The summary includes latest campaigns on the market,
+    // and some on-chain data (e.g. DAI balance on core SC)
+    Summary,
+    // The channel detail contains a summary of what validator knows about a channel
+    ChannelDetail
+}
+impl ActionLoad {
+    fn perform_effects(&self, orders: &mut Orders<Msg>) {
+        match self {
+            ActionLoad::Summary => {
+                // Load on-chain balances
+                let etherscan_uri = format!(
+                    "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
+                    ETHERSCAN_URL,
+                    DAI_ADDR,
+                    CORE_ADDR,
+                    ETHERSCAN_API_KEY
+                );
+                orders.perform_cmd(Request::new(&etherscan_uri)
+                    .method(Method::Get)
+                    .fetch_json()
+                    .map(Msg::BalanceLoaded)
+                    .map_err(Msg::OnFetchErr)
+                );
+
+                // Load campaigns from the market
+                orders.perform_cmd(Request::new(MARKET_URL)
+                    .method(Method::Get)
+                    .fetch_json()
+                    .map(Msg::ChannelsLoaded)
+                    .map_err(Msg::OnFetchErr)
+                );
+            },
+            ActionLoad::ChannelDetail => {
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 enum Msg {
-    LoadBalance,
+    Load(ActionLoad),
     BalanceLoaded(EtherscanBalResp),
-    LoadCampaigns,
     ChannelsLoaded(Vec<MarketChannel>),
     OnFetchErr(JsValue),
     SortSelected(String),
@@ -122,38 +162,22 @@ enum Msg {
 
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
     match msg {
-        Msg::LoadBalance => {
-            let url = format!(
-                "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
-                ETHERSCAN_URL,
-                DAI_ADDR,
-                CORE_ADDR,
-                ETHERSCAN_API_KEY
-            );
-            let order = Request::new(&url)
-                .method(Method::Get)
-                .fetch_json()
-                .map(Msg::BalanceLoaded)
-                .map_err(Msg::OnFetchErr);
-            orders.skip().perform_cmd(order);
+        Msg::Load(load_action) => {
+            // Do not render
+            orders.skip();
+            // Perform the effects
+            load_action.perform_effects(orders);
         }
         Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
-        Msg::LoadCampaigns => {
-            let order = Request::new(MARKET_URL)
-                .method(Method::Get)
-                .fetch_json()
-                .map(Msg::ChannelsLoaded)
-                .map_err(Msg::OnFetchErr);
-            orders.skip().perform_cmd(order);
-        }
         Msg::ChannelsLoaded(channels) => model.channels = Loadable::Ready(channels),
-        // @TODO handle this
-        Msg::OnFetchErr(_) => (),
         Msg::SortSelected(sort_name) => match &sort_name as &str {
             "deposit" => model.sort = ChannelSort::Deposit,
             "status" => model.sort = ChannelSort::Status,
             _ => (),
         },
+        // @TODO handle this
+        // report via a toast
+        Msg::OnFetchErr(_) => (),
     }
 }
 
@@ -291,10 +315,9 @@ pub fn render() {
         .finish()
         .run();
 
-    state.update(Msg::LoadCampaigns);
-    state.update(Msg::LoadBalance);
+    state.update(Msg::Load(ActionLoad::Summary));
     seed::set_interval(
-        Box::new(move || state.update(Msg::LoadCampaigns)),
-        UPDATE_MS,
+        Box::new(move || state.update(Msg::Load(ActionLoad::Summary))),
+        REFRESH_MS,
     );
 }
