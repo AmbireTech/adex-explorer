@@ -255,6 +255,8 @@ fn view(model: &Model) -> El<Msg> {
         h2![format!("Total paid: {}", dai_readable(&total_paid))],
         h2![
             //attrs!{ At::Class => "impressions-rainbow" },
+            // @TODO warn that this is an estimation; add a question mark next to it
+            // to explain what an estimation means
             format!(
                 "Total impressions: {}",
                 total_impressions.to_formatted_string(&Locale::en)
@@ -331,9 +333,24 @@ fn dai_readable(bal: &BigUint) -> String {
     }
 }
 
+
+// Router
+fn routes(url: &seed::Url) -> Msg {
+    match url.path.get(0).map(|x| x.as_ref()) {
+        Some("channel") => {
+            match url.path.get(1) {
+                Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
+                None => Msg::Load(ActionLoad::Summary)
+            }
+        },
+        _ => Msg::Load(ActionLoad::Summary),
+    }
+}
+
 #[wasm_bindgen]
 pub fn render() {
     let state = seed::App::build(Model::default(), update, view)
+        .routes(routes)
         .finish()
         .run();
 
