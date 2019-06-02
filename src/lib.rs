@@ -27,7 +27,10 @@ mod bignum;
 use bignum::*;
 
 const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
+const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
+const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
+const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const UPDATE_MS: i32 = 10000;
 
 // Data structs specific to the market
@@ -76,6 +79,12 @@ struct MarketChannel {
     pub spec: ChannelSpec,
 }
 
+// Etherscan API
+#[derive(Deserialize, Clone, Debug)]
+struct EtherscanBalResp {
+    pub result: BigNum
+}
+
 // Model
 enum Loadable<T> {
     Loading,
@@ -87,6 +96,7 @@ enum ChannelSort {
 }
 struct Model {
     pub channels: Loadable<Vec<MarketChannel>>,
+    pub balance: Loadable<EtherscanBalResp>,
     pub sort: ChannelSort,
 }
 impl Default for Model {
@@ -94,6 +104,7 @@ impl Default for Model {
         Model {
             channels: Loadable::Loading,
             sort: ChannelSort::Deposit,
+            balance: Loadable::Loading,
         }
     }
 }
@@ -101,6 +112,8 @@ impl Default for Model {
 // Update
 #[derive(Clone)]
 enum Msg {
+    LoadBalance,
+    BalanceLoaded(EtherscanBalResp),
     LoadCampaigns,
     ChannelsLoaded(Vec<MarketChannel>),
     OnFetchErr(JsValue),
@@ -109,6 +122,22 @@ enum Msg {
 
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
     match msg {
+        Msg::LoadBalance => {
+            let url = format!(
+                "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
+                ETHERSCAN_URL,
+                DAI_ADDR,
+                CORE_ADDR,
+                ETHERSCAN_API_KEY
+            );
+            let order = Request::new(&url)
+                .method(Method::Get)
+                .fetch_json()
+                .map(Msg::BalanceLoaded)
+                .map_err(Msg::OnFetchErr);
+            orders.skip().perform_cmd(order);
+        }
+        Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
         Msg::LoadCampaigns => {
             let order = Request::new(MARKET_URL)
                 .method(Method::Get)
@@ -153,6 +182,10 @@ fn view(model: &Model) -> El<Msg> {
         .collect();
 
     let total_paid: BigUint = channels_dai.iter().map(|x| x.status.balances_sum()).sum();
+    let total_deposit: BigUint = channels_dai
+        .iter()
+        .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
+        .sum();
 
     match model.sort {
         ChannelSort::Deposit => {
@@ -161,12 +194,11 @@ fn view(model: &Model) -> El<Msg> {
         ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
     }
 
-    let total_deposit: BigUint = channels_dai
-        .iter()
-        .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
-        .sum();
-
     div![
+        match &model.balance {
+            Loadable::Ready(resp) => h2![format!("Locked up on-chain: {}", dai_readable(&resp.result.0))],
+            _ => seed::empty()
+        },
         h2![format!("Total campaigns: {}", channels.len())],
         h2![format!("Total ad units: {}", channels.iter().map(|x| x.spec.ad_units.len()).sum::<usize>())],
         h2![format!(
@@ -260,6 +292,7 @@ pub fn render() {
         .run();
 
     state.update(Msg::LoadCampaigns);
+    state.update(Msg::LoadBalance);
     seed::set_interval(
         Box::new(move || state.update(Msg::LoadCampaigns)),
         UPDATE_MS,
