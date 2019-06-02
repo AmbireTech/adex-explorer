@@ -26,11 +26,12 @@ use channel::*;
 mod bignum;
 use bignum::*;
 
-const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
+const MARKET_URL: &str = "https://market.adex.network";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
+const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
 const REFRESH_MS: i32 = 10000;
 
 // Data structs specific to the market
@@ -96,17 +97,21 @@ enum ChannelSort {
 }
 struct Model {
     pub load_action: ActionLoad,
-    pub channels: Loadable<Vec<MarketChannel>>,
-    pub balance: Loadable<EtherscanBalResp>,
     pub sort: ChannelSort,
+    // Market channels & balance: for the summaries page
+    pub market_channels: Loadable<Vec<MarketChannel>>,
+    pub balance: Loadable<EtherscanBalResp>,
+    // Current selected channel: for ChannelDetail
+    pub channel: Loadable<Channel>,
 }
 impl Default for Model {
     fn default() -> Self {
         Model {
             load_action: ActionLoad::Summary,
-            channels: Loadable::Loading,
+            market_channels: Loadable::Loading,
             sort: ChannelSort::Deposit,
             balance: Loadable::Loading,
+            channel: Loadable::Loading,
         }
     }
 }
@@ -118,7 +123,7 @@ enum ActionLoad {
     // and some on-chain data (e.g. DAI balance on core SC)
     Summary,
     // The channel detail contains a summary of what validator knows about a channel
-    ChannelDetail
+    ChannelDetail(String)
 }
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut Orders<Msg>) {
@@ -140,14 +145,23 @@ impl ActionLoad {
                 );
 
                 // Load campaigns from the market
-                orders.perform_cmd(Request::new(MARKET_URL)
+                orders.perform_cmd(Request::new(&format!("{}/campaigns?all", MARKET_URL))
                     .method(Method::Get)
                     .fetch_json()
                     .map(Msg::ChannelsLoaded)
                     .map_err(Msg::OnFetchErr)
                 );
             },
-            ActionLoad::ChannelDetail => {
+            ActionLoad::ChannelDetail(id) => {
+                let market_uri = format!(
+                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
+                    MARKET_URL,
+                    &id,
+                    // @TODO get rid of this default earner thing, it's very very temporary
+                    // we should get an aggr of all earners
+                    DEFAULT_EARNER
+                );
+                // @TODO
             }
         }
     }
@@ -178,7 +192,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             model.load_action.perform_effects(orders);
         }
         Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
-        Msg::ChannelsLoaded(channels) => model.channels = Loadable::Ready(channels),
+        Msg::ChannelsLoaded(channels) => model.market_channels = Loadable::Ready(channels),
         Msg::SortSelected(sort_name) => match &sort_name as &str {
             "deposit" => model.sort = ChannelSort::Deposit,
             "status" => model.sort = ChannelSort::Status,
@@ -192,7 +206,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 
 // View
 fn view(model: &Model) -> El<Msg> {
-    let channels = match &model.channels {
+    let channels = match &model.market_channels {
         Loadable::Loading => return h2!["Loading..."],
         Loadable::Ready(c) => c,
     };
