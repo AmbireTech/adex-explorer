@@ -95,6 +95,7 @@ enum ChannelSort {
     Status,
 }
 struct Model {
+    pub load_action: ActionLoad,
     pub channels: Loadable<Vec<MarketChannel>>,
     pub balance: Loadable<EtherscanBalResp>,
     pub sort: ChannelSort,
@@ -102,6 +103,7 @@ struct Model {
 impl Default for Model {
     fn default() -> Self {
         Model {
+            load_action: ActionLoad::Summary,
             channels: Loadable::Loading,
             sort: ChannelSort::Deposit,
             balance: Loadable::Loading,
@@ -154,6 +156,7 @@ impl ActionLoad {
 #[derive(Clone)]
 enum Msg {
     Load(ActionLoad),
+    Refresh,
     BalanceLoaded(EtherscanBalResp),
     ChannelsLoaded(Vec<MarketChannel>),
     OnFetchErr(JsValue),
@@ -167,6 +170,12 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip();
             // Perform the effects
             load_action.perform_effects(orders);
+            // This can be used on refresh
+            model.load_action = load_action;
+        }
+        Msg::Refresh => {
+            orders.skip();
+            model.load_action.perform_effects(orders);
         }
         Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
         Msg::ChannelsLoaded(channels) => model.channels = Loadable::Ready(channels),
@@ -317,7 +326,7 @@ pub fn render() {
 
     state.update(Msg::Load(ActionLoad::Summary));
     seed::set_interval(
-        Box::new(move || state.update(Msg::Load(ActionLoad::Summary))),
+        Box::new(move || state.update(Msg::Refresh)),
         REFRESH_MS,
     );
 }
