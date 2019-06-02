@@ -252,13 +252,11 @@ fn view(model: &Model) -> El<Msg> {
             option![attrs! {At::Value => "status"}, "Sort by status"],
             input_ev(Ev::Input, Msg::SortSelected)
         ],
-        table![view_channel_table(&channels_dai)]
+        table![channel_table(&channels_dai)]
     ]
 }
 
-fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
-    let rows = channels.iter().map(view_channel);
-
+fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -270,11 +268,11 @@ fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
     ];
 
     std::iter::once(header)
-        .chain(rows)
+        .chain(channels.iter().map(channel))
         .collect::<Vec<El<Msg>>>()
 }
 
-fn view_channel(channel: &MarketChannel) -> El<Msg> {
+fn channel(channel: &MarketChannel) -> El<Msg> {
     let deposit_amount = &channel.deposit_amount.0;
     let paid_total = channel.status.balances_sum();
     let url = format!(
@@ -310,6 +308,7 @@ fn view_channel(channel: &MarketChannel) -> El<Msg> {
         }]
     ]
 }
+
 fn dai_readable(bal: &BigUint) -> String {
     // 10 ** 16
     match bal.div_floor(&10_000_000_000_000_000u64.into()).to_f64() {
