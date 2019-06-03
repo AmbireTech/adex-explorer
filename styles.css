@@ -12,6 +12,9 @@ body {
 table td {
   padding: 0.5em 1.5em; 
 }
+table tr.not-recent {
+  background-color: #fa8b8b;
+}
 table tr:first-child {
   background-color: rgb(27, 117, 188);
   color: white;
