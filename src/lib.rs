@@ -29,6 +29,7 @@ use bignum::*;
 const MARKET_URL: &str = "https://market.adex.network";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
+const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
@@ -284,6 +285,7 @@ fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         td!["Status"],
         td!["Created"],
         td!["Last updated"],
+        td!["Preview"]
     ];
 
     std::iter::once(header)
@@ -317,7 +319,21 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         td![format!("{:?}", &channel.status.status_type)],
         td![time(&channel.spec.created)],
         td![time(&channel.status.last_checked)],
+        td![class!["preview"], {
+            match channel.spec.ad_units.get(0) {
+                Some(unit) => image(&unit.media_url),
+                None => seed::empty()
+            }
+        }]
     ]
+}
+
+fn image(url: &str) -> El<Msg> {
+    if url.starts_with("ipfs://") {
+        img![attrs!{ At::Src => url.replace("ipfs://", IPFS_GATEWAY) }]
+    } else {
+        img![attrs!{ At::Src => url }]
+    }
 }
 
 fn time(t: &DateTime<Utc>) -> String {
@@ -339,7 +355,6 @@ fn dai_readable(bal: &BigUint) -> String {
         None => ">max".to_owned(),
     }
 }
-
 
 // Router
 fn routes(url: &seed::Url) -> Msg {
