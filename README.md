@@ -11,6 +11,8 @@
 
 `cargo install --force cargo-make`
 
+`curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh`
+
 Run `cargo make all` in a terminal to build the app, and `cargo make serve` to start a dev server
 on `127.0.0.0:8000`.
 
