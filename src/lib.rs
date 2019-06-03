@@ -88,6 +88,7 @@ enum Loadable<T> {
 enum ChannelSort {
     Deposit,
     Status,
+    Created
 }
 struct Model {
     pub load_action: ActionLoad,
@@ -190,6 +191,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
         Msg::SortSelected(sort_name) => match &sort_name as &str {
             "deposit" => model.sort = ChannelSort::Deposit,
             "status" => model.sort = ChannelSort::Status,
+            "created" => model.sort = ChannelSort::Created,
             _ => (),
         },
         // @TODO handle this
@@ -233,6 +235,7 @@ fn view(model: &Model) -> El<Msg> {
             channels_dai.sort_by(|x, y| y.deposit_amount.0.cmp(&x.deposit_amount.0));
         }
         ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
+        ChannelSort::Created => channels_dai.sort_by(|x, y| y.spec.created.cmp(&x.spec.created)),
     }
 
     div![
@@ -255,6 +258,7 @@ fn view(model: &Model) -> El<Msg> {
                 attrs! {At::Value => "deposit"},
                 option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
                 option![attrs! {At::Value => "status"}, "Sort by status"],
+                option![attrs! {At::Value => "created"}, "Sort by created"],
                 input_ev(Ev::Input, Msg::SortSelected)
             ],
             table![channel_table(&channels_dai)]
