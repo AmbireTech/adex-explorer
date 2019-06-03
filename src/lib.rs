@@ -1,20 +1,16 @@
 #[macro_use]
 extern crate seed;
-use chrono::serde::ts_milliseconds;
-use chrono::{DateTime, Utc};
-use futures::Future;
-use num::bigint::BigUint;
-use num::integer::Integer;
-use num::traits::ToPrimitive;
-use num_format::{Locale, ToFormattedString};
-use seed::prelude::*;
-use seed::{Method, Request};
-use serde::Deserialize;
-use std::collections::HashMap;
-use adex_domain::Spec;
 
-mod bignum;
-use bignum::*;
+use std::collections::HashMap;
+
+use adex_domain::{ChannelSpec, Channel, BigNum};
+use chrono::{DateTime, Utc};
+use chrono::serde::ts_milliseconds;
+use futures::Future;
+use num_format::{Locale, ToFormattedString};
+use seed::{Method, Request};
+use seed::prelude::*;
+use serde::Deserialize;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
@@ -51,8 +47,8 @@ struct MarketStatus {
     pub last_checked: DateTime<Utc>,
 }
 impl MarketStatus {
-    fn balances_sum(&self) -> BigUint {
-        self.balances.iter().map(|(_, v)| &v.0).sum()
+    fn balances_sum(&self) -> BigNum {
+        self.balances.iter().map(|(_, v)| v).sum()
     }
 }
 #[derive(Deserialize, Clone, Debug)]
@@ -201,7 +197,7 @@ fn view(model: &Model) -> El<Msg> {
     let total_impressions: u64 = channels
         .iter()
         .map(|x| {
-            (&x.status.balances_sum() / &x.spec.min_per_impression.0)
+            (&x.status.balances_sum() / &x.spec.min_per_impression)
                 .to_u64()
                 .unwrap_or(0)
         })
@@ -215,15 +211,15 @@ fn view(model: &Model) -> El<Msg> {
         .cloned()
         .collect();
 
-    let total_paid: BigUint = channels_dai.iter().map(|x| x.status.balances_sum()).sum();
-    let total_deposit: BigUint = channels_dai
+    let total_paid = channels_dai.iter().map(|x| x.status.balances_sum()).sum();
+    let total_deposit = channels_dai
         .iter()
-        .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
+        .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
         .sum();
 
     match model.sort {
         ChannelSort::Deposit => {
-            channels_dai.sort_by(|x, y| y.deposit_amount.0.cmp(&x.deposit_amount.0));
+            channels_dai.sort_by(|x, y| y.deposit_amount.cmp(&x.deposit_amount));
         }
         ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
         ChannelSort::Created => channels_dai.sort_by(|x, y| y.spec.created.cmp(&x.spec.created)),
@@ -231,7 +227,7 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         match &model.balance {
-            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result.0)),
+            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
             _ => seed::empty()
         },
         card("Campaigns", &channels.len().to_string()),
@@ -284,7 +280,7 @@ fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
 }
 
 fn channel(channel: &MarketChannel) -> El<Msg> {
-    let deposit_amount = &channel.deposit_amount.0;
+    let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
         "{}/channel/{}/status",
@@ -302,8 +298,8 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         td![dai_readable(&deposit_amount)],
         td![dai_readable(&paid_total)],
         td![{
-            let base = 100000u32;
-            let paid_units = (paid_total * base).div_floor(deposit_amount);
+            let base = 100000_u64;
+            let paid_units = (&paid_total * &base.into()).div_floor(deposit_amount);
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
         }],
@@ -345,8 +341,8 @@ fn time(t: &DateTime<Utc>) -> String {
     }
 }
 
-fn dai_readable(bal: &BigUint) -> String {
-    // 10 ** 16
+fn dai_readable(bal: &BigNum) -> String {
+    // 10 ** 16`
     match bal.div_floor(&10_000_000_000_000_000u64.into()).to_f64() {
         Some(hundreds) => format!("{:.2} DAI", hundreds / 100.0),
         None => ">max".to_owned(),
