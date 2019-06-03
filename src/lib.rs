@@ -284,7 +284,7 @@ fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         td!["Paid - %"],
         td!["Status"],
         td!["Created"],
-        td!["Last updated"],
+        //td!["Last updated"],
         td!["Preview"]
     ];
 
@@ -303,6 +303,7 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
     );
     let id_prefix = channel.id.chars().take(6).collect::<String>();
     tr![
+        class!(if seconds_since(&channel.status.last_checked) > 180 { "not-recent" } else { "recent" }),
         td![a![
             attrs! {At::Href => url; At::Target => "_blank"},
             id_prefix
@@ -318,7 +319,7 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         }],
         td![format!("{:?}", &channel.status.status_type)],
         td![time(&channel.spec.created)],
-        td![time(&channel.status.last_checked)],
+        //td![time(&channel.status.last_checked)],
         td![class!["preview"], {
             match channel.spec.ad_units.get(0) {
                 Some(unit) => image(&unit.media_url),
@@ -336,15 +337,18 @@ fn image(url: &str) -> El<Msg> {
     }
 }
 
+fn seconds_since(t: &DateTime<Utc>) -> i64 {
+    (js_sys::Date::now() as i64) / 1000 - t.timestamp()
+}
+
 fn time(t: &DateTime<Utc>) -> String {
-    let stamp = &t.timestamp();
-    let time_diff = (js_sys::Date::now() as i64) / 1000 - stamp;
+    let time_diff = seconds_since(t);
     match time_diff {
         x if x < 0 => format!("just now"),
         x if x < 60 => format!("{} seconds ago", x),
         x if x < 3600 => format!("{} minutes ago", x / 60),
         x if x < 86400 => format!("{} hours ago", x / 3600),
-        _ => format!("{}", t.format("%Y-%m-%d %T")),
+        _ => format!("{}", t.format("%Y-%m-%d")), // %T if we want time
     }
 }
 
