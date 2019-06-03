@@ -278,6 +278,7 @@ fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         td!["Paid"],
         td!["Paid - %"],
         td!["Status"],
+        td!["Created"],
         td!["Last updated"],
     ];
 
@@ -310,17 +311,21 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
             format!("{:.3}%", paid_hundreds)
         }],
         td![format!("{:?}", &channel.status.status_type)],
-        td![{
-            let last_checked = &channel.status.last_checked.timestamp();
-            let time_diff = (js_sys::Date::now() as i64) / 1000 - last_checked;
-            match time_diff {
-                x if x < 0 => format!("just now"),
-                x if x < 60 => format!("{} seconds ago", x),
-                x if x < 3600 => format!("{} minutes ago", x / 60),
-                _ => format!("{}", channel.status.last_checked.format("%Y-%m-%d %T")),
-            }
-        }]
+        td![time(&channel.spec.created)],
+        td![time(&channel.status.last_checked)],
     ]
+}
+
+fn time(t: &DateTime<Utc>) -> String {
+    let stamp = &t.timestamp();
+    let time_diff = (js_sys::Date::now() as i64) / 1000 - stamp;
+    match time_diff {
+        x if x < 0 => format!("just now"),
+        x if x < 60 => format!("{} seconds ago", x),
+        x if x < 3600 => format!("{} minutes ago", x / 60),
+        x if x < 86400 => format!("{} hours ago", x / 3600),
+        _ => format!("{}", t.format("%Y-%m-%d %T")),
+    }
 }
 
 fn dai_readable(bal: &BigUint) -> String {
