@@ -312,7 +312,10 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         //td![time(&channel.status.last_checked)],
         td![class!["preview"], {
             match channel.spec.ad_units.get(0) {
-                Some(unit) => image(&unit.media_url),
+                Some(unit) =>  a![
+                    attrs! { At::Href => &unit.target_url; At::Target => "_blank" },
+                    image(&unit.media_url)
+                ],
                 None => seed::empty()
             }
         }]
