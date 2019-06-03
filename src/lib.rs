@@ -11,17 +11,7 @@ use seed::prelude::*;
 use seed::{Method, Request};
 use serde::Deserialize;
 use std::collections::HashMap;
-
-mod ad_unit;
-use ad_unit::*;
-mod targeting_tag;
-use targeting_tag::*;
-mod validator;
-use validator::*;
-mod event_submission;
-use event_submission::*;
-mod channel;
-use channel::*;
+use adex_domain::Spec;
 
 mod bignum;
 use bignum::*;
