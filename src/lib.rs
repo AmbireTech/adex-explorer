@@ -238,7 +238,8 @@ fn view(model: &Model) -> El<Msg> {
             "Ad units",
             &channels
                 .iter()
-                .flat_map(|x| x.spec.ad_units.iter().map(|y| y.ipfs.clone()))
+                .flat_map(|x| &x.spec.ad_units)
+                .map(|x| &x.ipfs)
                 .collect::<HashSet<_>>()
                 .len()
                 .to_string()
