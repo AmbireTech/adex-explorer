@@ -3,13 +3,13 @@ extern crate seed;
 
 use std::collections::HashMap;
 
-use adex_domain::{ChannelSpec, Channel, BigNum};
-use chrono::{DateTime, Utc};
+use adex_domain::{BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
+use chrono::{DateTime, Utc};
 use futures::Future;
 use num_format::{Locale, ToFormattedString};
-use seed::{Method, Request};
 use seed::prelude::*;
+use seed::{Method, Request};
 use serde::Deserialize;
 
 const MARKET_URL: &str = "https://market.adex.network";
@@ -64,7 +64,7 @@ struct MarketChannel {
 // Etherscan API
 #[derive(Deserialize, Clone, Debug)]
 struct EtherscanBalResp {
-    pub result: BigNum
+    pub result: BigNum,
 }
 
 // Model
@@ -75,7 +75,7 @@ enum Loadable<T> {
 enum ChannelSort {
     Deposit,
     Status,
-    Created
+    Created,
 }
 struct Model {
     pub load_action: ActionLoad,
@@ -105,7 +105,7 @@ enum ActionLoad {
     // and some on-chain data (e.g. DAI balance on core SC)
     Summary,
     // The channel detail contains a summary of what validator knows about a channel
-    ChannelDetail(String)
+    ChannelDetail(String),
 }
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut Orders<Msg>) {
@@ -119,21 +119,23 @@ impl ActionLoad {
                     CORE_ADDR,
                     ETHERSCAN_API_KEY
                 );
-                orders.perform_cmd(Request::new(&etherscan_uri)
-                    .method(Method::Get)
-                    .fetch_json()
-                    .map(Msg::BalanceLoaded)
-                    .map_err(Msg::OnFetchErr)
+                orders.perform_cmd(
+                    Request::new(&etherscan_uri)
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::BalanceLoaded)
+                        .map_err(Msg::OnFetchErr),
                 );
 
                 // Load campaigns from the market
-                orders.perform_cmd(Request::new(&format!("{}/campaigns?all", MARKET_URL))
-                    .method(Method::Get)
-                    .fetch_json()
-                    .map(Msg::ChannelsLoaded)
-                    .map_err(Msg::OnFetchErr)
+                orders.perform_cmd(
+                    Request::new(&format!("{}/campaigns?all", MARKET_URL))
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::ChannelsLoaded)
+                        .map_err(Msg::OnFetchErr),
                 );
-            },
+            }
             ActionLoad::ChannelDetail(id) => {
                 let market_uri = format!(
                     "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
@@ -228,10 +230,17 @@ fn view(model: &Model) -> El<Msg> {
     div![
         match &model.balance {
             Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
-            _ => seed::empty()
+            _ => seed::empty(),
         },
         card("Campaigns", &channels.len().to_string()),
-        card("Ad units", &channels.iter().map(|x| x.spec.ad_units.len()).sum::<usize>().to_string()),
+        card(
+            "Ad units",
+            &channels
+                .iter()
+                .map(|x| x.spec.ad_units.len())
+                .sum::<usize>()
+                .to_string()
+        ),
         card("Total campaign deposits", &dai_readable(&total_deposit)),
         card("Paid out", &dai_readable(&total_paid)),
         // @TODO warn that this is an estimation; add a question mark next to it
@@ -290,14 +299,20 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
     );
     let id_prefix = channel.id.chars().take(6).collect::<String>();
     tr![
-        class!(if seconds_since(&channel.status.last_checked) > 180 { "not-recent" } else { "recent" }),
+        class!(if seconds_since(&channel.status.last_checked) > 180 {
+            "not-recent"
+        } else {
+            "recent"
+        }),
         td![a![
             attrs! {At::Href => url; At::Target => "_blank"},
             id_prefix
         ]],
         td![format!("${:.2}", &channel.status.usd_estimate)],
         td![dai_readable(&deposit_amount)],
-        td![dai_readable(&(&channel.spec.min_per_impression * &1000.into()))],
+        td![dai_readable(
+            &(&channel.spec.min_per_impression * &1000.into())
+        )],
         td![dai_readable(&paid_total)],
         td![{
             let base = 100000_u64;
@@ -310,11 +325,11 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         //td![time(&channel.status.last_checked)],
         td![class!["preview"], {
             match channel.spec.ad_units.get(0) {
-                Some(unit) =>  a![
+                Some(unit) => a![
                     attrs! { At::Href => &unit.target_url; At::Target => "_blank" },
                     image(&unit.media_url)
                 ],
-                None => seed::empty()
+                None => seed::empty(),
             }
         }]
     ]
@@ -322,9 +337,9 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
 
 fn image(url: &str) -> El<Msg> {
     if url.starts_with("ipfs://") {
-        img![attrs!{ At::Src => url.replace("ipfs://", IPFS_GATEWAY) }]
+        img![attrs! { At::Src => url.replace("ipfs://", IPFS_GATEWAY) }]
     } else {
-        img![attrs!{ At::Src => url }]
+        img![attrs! { At::Src => url }]
     }
 }
 
@@ -354,11 +369,9 @@ fn dai_readable(bal: &BigNum) -> String {
 // Router
 fn routes(url: &seed::Url) -> Msg {
     match url.path.get(0).map(|x| x.as_ref()) {
-        Some("channel") => {
-            match url.path.get(1) {
-                Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
-                None => Msg::Load(ActionLoad::Summary)
-            }
+        Some("channel") => match url.path.get(1) {
+            Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
+            None => Msg::Load(ActionLoad::Summary),
         },
         _ => Msg::Load(ActionLoad::Summary),
     }
@@ -372,8 +385,5 @@ pub fn render() {
         .run();
 
     state.update(Msg::Load(ActionLoad::Summary));
-    seed::set_interval(
-        Box::new(move || state.update(Msg::Refresh)),
-        REFRESH_MS,
-    );
+    seed::set_interval(Box::new(move || state.update(Msg::Refresh)), REFRESH_MS);
 }
