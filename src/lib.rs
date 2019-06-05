@@ -11,6 +11,7 @@ use num_format::{Locale, ToFormattedString};
 use seed::prelude::*;
 use seed::{Method, Request};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
@@ -237,8 +238,9 @@ fn view(model: &Model) -> El<Msg> {
             "Ad units",
             &channels
                 .iter()
-                .map(|x| x.spec.ad_units.len())
-                .sum::<usize>()
+                .flat_map(|x| x.spec.ad_units.iter().map(|y| y.ipfs.clone()))
+                .collect::<HashSet<_>>()
+                .len()
                 .to_string()
         ),
         card("Total campaign deposits", &dai_readable(&total_deposit)),
