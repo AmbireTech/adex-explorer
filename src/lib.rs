@@ -266,6 +266,7 @@ fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
         td!["URL"],
         td!["USD estimate"],
         td!["Deposit"],
+        td!["CPM"],
         td!["Paid"],
         td!["Paid - %"],
         td!["Status"],
@@ -296,6 +297,7 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         ]],
         td![format!("${:.2}", &channel.status.usd_estimate)],
         td![dai_readable(&deposit_amount)],
+        td![dai_readable(&(&channel.spec.min_per_impression * &1000.into()))],
         td![dai_readable(&paid_total)],
         td![{
             let base = 100000_u64;
