@@ -73,11 +73,22 @@ enum Loadable<T> {
     Loading,
     Ready(T),
 }
+impl<T> Default for Loadable<T> {
+    fn default() -> Self {
+        Loadable::Loading
+    }
+}
 enum ChannelSort {
     Deposit,
     Status,
     Created,
 }
+impl Default for ChannelSort {
+    fn default() -> Self {
+        ChannelSort::Deposit
+    }
+}
+#[derive(Default)]
 struct Model {
     pub load_action: ActionLoad,
     pub sort: ChannelSort,
@@ -86,17 +97,6 @@ struct Model {
     pub balance: Loadable<EtherscanBalResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
-}
-impl Default for Model {
-    fn default() -> Self {
-        Model {
-            load_action: ActionLoad::Summary,
-            market_channels: Loadable::Loading,
-            sort: ChannelSort::Deposit,
-            balance: Loadable::Loading,
-            channel: Loadable::Loading,
-        }
-    }
 }
 
 // Update
@@ -107,6 +107,11 @@ enum ActionLoad {
     Summary,
     // The channel detail contains a summary of what validator knows about a channel
     ChannelDetail(String),
+}
+impl Default for ActionLoad {
+    fn default() -> Self {
+        ActionLoad::Summary
+    }
 }
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut Orders<Msg>) {
