@@ -12,6 +12,7 @@ use seed::prelude::*;
 use seed::{Method, Request};
 use serde::Deserialize;
 use std::collections::HashSet;
+use lazysort::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
@@ -78,6 +79,7 @@ impl<T> Default for Loadable<T> {
         Loadable::Loading
     }
 }
+#[derive(Clone, Copy)]
 enum ChannelSort {
     Deposit,
     Status,
@@ -260,17 +262,17 @@ fn view(model: &Model) -> El<Msg> {
                 option![attrs! {At::Value => "created"}, "Sort by created"],
                 input_ev(Ev::Input, Msg::SortSelected)
             ],
-            table![channel_table(model.last_loaded, &{
-                let mut channels_dai: Vec<MarketChannel> = channels_dai.clone().cloned().collect();
-                match model.sort {
-                    ChannelSort::Deposit => {
-                        channels_dai.sort_by(|x, y| y.deposit_amount.cmp(&x.deposit_amount));
-                    }
-                    ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
-                    ChannelSort::Created => channels_dai.sort_by(|x, y| y.spec.created.cmp(&x.spec.created)),
-                }
-                channels_dai
-            })]
+            table![channel_table(
+                model.last_loaded,
+                &channels_dai
+                    .clone()
+                    .sorted_by(|x, y| match model.sort {
+                        ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                        ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                        ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                    })
+                    .collect::<Vec<&MarketChannel>>()
+            )]
         ]
     ]
 }
@@ -283,7 +285,7 @@ fn card(label: &str, value: &str) -> El<Msg> {
     ]
 }
 
-fn channel_table(last_loaded: i64, channels: &[MarketChannel]) -> Vec<El<Msg>> {
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Vec<El<Msg>> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
