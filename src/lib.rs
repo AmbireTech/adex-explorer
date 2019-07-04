@@ -7,12 +7,12 @@ use adex_domain::{BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use futures::Future;
+use lazysort::*;
 use num_format::{Locale, ToFormattedString};
 use seed::prelude::*;
 use seed::{Method, Request};
 use serde::Deserialize;
 use std::collections::HashSet;
-use lazysort::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
