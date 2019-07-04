@@ -57,6 +57,7 @@ impl MarketStatus {
 #[serde(rename_all = "camelCase")]
 struct MarketChannel {
     pub id: String,
+    pub creator: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
     pub status: MarketStatus,
@@ -239,12 +240,18 @@ fn view(model: &Model) -> El<Msg> {
         .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
         .sum();
 
+    let unique_publishers = channels_dai
+        .clone()
+        .flat_map(|x| x.status.balances.keys().filter(|k| **k != x.creator).collect::<Vec<&String>>())
+        .collect::<std::collections::HashSet<_>>();
+
     div![
         match &model.balance {
             Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
             _ => seed::empty(),
         },
         card("Campaigns", &channels.len().to_string()),
+        card("Publishers", &unique_publishers.len().to_string()),
         card(
             "Ad units",
             &channels
