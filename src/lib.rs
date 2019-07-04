@@ -97,6 +97,7 @@ struct Model {
     pub balance: Loadable<EtherscanBalResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
+    pub last_loaded: i64,
 }
 
 // Update
@@ -142,6 +143,7 @@ impl ActionLoad {
                         .map_err(Msg::OnFetchErr),
                 );
             }
+            // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
                 let market_uri = format!(
                     "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
@@ -182,7 +184,10 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             model.load_action.perform_effects(orders);
         }
         Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
-        Msg::ChannelsLoaded(channels) => model.market_channels = Loadable::Ready(channels),
+        Msg::ChannelsLoaded(channels) => {
+            model.market_channels = Loadable::Ready(channels);
+            model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+        }
         Msg::SortSelected(sort_name) => match &sort_name as &str {
             "deposit" => model.sort = ChannelSort::Deposit,
             "status" => model.sort = ChannelSort::Status,
@@ -265,7 +270,7 @@ fn view(model: &Model) -> El<Msg> {
                 option![attrs! {At::Value => "created"}, "Sort by created"],
                 input_ev(Ev::Input, Msg::SortSelected)
             ],
-            table![channel_table(&channels_dai)]
+            table![channel_table(model.last_loaded, &channels_dai)]
         ]
     ]
 }
@@ -278,7 +283,7 @@ fn card(label: &str, value: &str) -> El<Msg> {
     ]
 }
 
-fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
+fn channel_table(last_loaded: i64, channels: &[MarketChannel]) -> Vec<El<Msg>> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -293,11 +298,11 @@ fn channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
     ];
 
     std::iter::once(header)
-        .chain(channels.iter().map(channel))
+        .chain(channels.iter().map(|c| channel(last_loaded, c)))
         .collect::<Vec<El<Msg>>>()
 }
 
-fn channel(channel: &MarketChannel) -> El<Msg> {
+fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
@@ -306,12 +311,16 @@ fn channel(channel: &MarketChannel) -> El<Msg> {
         channel.id
     );
     let id_prefix = channel.id.chars().take(6).collect::<String>();
+    // This has a tiny issue: when you go back to the explorer after being in another window,
+    // stuff will be not-recent until we get the latest status
     tr![
-        class!(if seconds_since(&channel.status.last_checked) > 180 {
-            "not-recent"
-        } else {
-            "recent"
-        }),
+        class!(
+            if last_loaded - channel.status.last_checked.timestamp() > 180 {
+                "not-recent"
+            } else {
+                "recent"
+            }
+        ),
         td![a![
             attrs! {At::Href => url; At::Target => "_blank"},
             id_prefix
@@ -351,12 +360,8 @@ fn image(url: &str) -> El<Msg> {
     }
 }
 
-fn seconds_since(t: &DateTime<Utc>) -> i64 {
-    (js_sys::Date::now() as i64) / 1000 - t.timestamp()
-}
-
 fn time(t: &DateTime<Utc>) -> String {
-    let time_diff = seconds_since(t);
+    let time_diff = ((js_sys::Date::now() as i64) / 1000) - t.timestamp();
     match time_diff {
         x if x < 0 => format!("just now"),
         x if x < 60 => format!("{} seconds ago", x),
