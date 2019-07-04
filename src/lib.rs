@@ -251,12 +251,7 @@ fn view(model: &Model) -> El<Msg> {
         .collect::<std::collections::HashSet<_>>();
 
     div![
-        match &model.balance {
-            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
-            _ => seed::empty(),
-        },
         card("Campaigns", &channels.len().to_string()),
-        card("Publishers", &unique_publishers.len().to_string()),
         card(
             "Ad units",
             &channels
@@ -275,6 +270,11 @@ fn view(model: &Model) -> El<Msg> {
             "Impressions",
             &total_impressions.to_formatted_string(&Locale::en)
         ),
+        card("Publishers", &unique_publishers.len().to_string()),
+        match &model.balance {
+            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
+            _ => seed::empty(),
+        },
         div![
             select![
                 attrs! {At::Value => "deposit"},
