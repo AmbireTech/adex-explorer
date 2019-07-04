@@ -338,7 +338,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
             format!("{:.3}%", paid_hundreds)
         }],
         td![format!("{:?}", &channel.status.status_type)],
-        td![time(&channel.spec.created)],
+        td![time_diff(last_loaded, &channel.spec.created)],
         //td![time(&channel.status.last_checked)],
         td![class!["preview"], {
             match channel.spec.ad_units.get(0) {
@@ -360,8 +360,8 @@ fn image(url: &str) -> El<Msg> {
     }
 }
 
-fn time(t: &DateTime<Utc>) -> String {
-    let time_diff = ((js_sys::Date::now() as i64) / 1000) - t.timestamp();
+fn time_diff(now_seconds: i64, t: &DateTime<Utc>) -> String {
+    let time_diff = now_seconds - t.timestamp();
     match time_diff {
         x if x < 0 => format!("just now"),
         x if x < 60 => format!("{} seconds ago", x),
