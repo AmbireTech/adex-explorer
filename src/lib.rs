@@ -104,7 +104,6 @@ impl From<String> for ChannelSort {
     }
 }
 
-
 #[derive(Default)]
 struct Model {
     pub load_action: ActionLoad,
@@ -242,7 +241,13 @@ fn view(model: &Model) -> El<Msg> {
 
     let unique_publishers = channels_dai
         .clone()
-        .flat_map(|x| x.status.balances.keys().filter(|k| **k != x.creator).collect::<Vec<&String>>())
+        .flat_map(|x| {
+            x.status
+                .balances
+                .keys()
+                .filter(|k| **k != x.creator)
+                .collect::<Vec<&String>>()
+        })
         .collect::<std::collections::HashSet<_>>();
 
     div![
