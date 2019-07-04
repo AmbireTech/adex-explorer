@@ -79,6 +79,7 @@ impl<T> Default for Loadable<T> {
         Loadable::Loading
     }
 }
+
 #[derive(Clone, Copy)]
 enum ChannelSort {
     Deposit,
@@ -90,6 +91,19 @@ impl Default for ChannelSort {
         ChannelSort::Deposit
     }
 }
+// @TODO can we derive this automatically
+impl From<String> for ChannelSort {
+    fn from(sort_name: String) -> Self {
+        match &sort_name as &str {
+            "deposit" => ChannelSort::Deposit,
+            "status" => ChannelSort::Status,
+            "created" => ChannelSort::Created,
+            _ => ChannelSort::default(),
+        }
+    }
+}
+
+
 #[derive(Default)]
 struct Model {
     pub load_action: ActionLoad,
@@ -190,12 +204,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             model.market_channels = Loadable::Ready(channels);
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
-        Msg::SortSelected(sort_name) => match &sort_name as &str {
-            "deposit" => model.sort = ChannelSort::Deposit,
-            "status" => model.sort = ChannelSort::Status,
-            "created" => model.sort = ChannelSort::Created,
-            _ => (),
-        },
+        Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
         Msg::OnFetchErr(_) => (),
