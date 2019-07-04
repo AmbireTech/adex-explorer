@@ -218,25 +218,15 @@ fn view(model: &Model) -> El<Msg> {
 
     // @TODO we can make a special type for DAI channels and that way shield ourselves of
     // rendering wrongly
-    let mut channels_dai: Vec<MarketChannel> = channels
+    let channels_dai = channels
         .iter()
-        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR)
-        .cloned()
-        .collect();
+        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
 
-    let total_paid = channels_dai.iter().map(|x| x.status.balances_sum()).sum();
+    let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
     let total_deposit = channels_dai
-        .iter()
+        .clone()
         .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
         .sum();
-
-    match model.sort {
-        ChannelSort::Deposit => {
-            channels_dai.sort_by(|x, y| y.deposit_amount.cmp(&x.deposit_amount));
-        }
-        ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
-        ChannelSort::Created => channels_dai.sort_by(|x, y| y.spec.created.cmp(&x.spec.created)),
-    }
 
     div![
         match &model.balance {
@@ -270,7 +260,17 @@ fn view(model: &Model) -> El<Msg> {
                 option![attrs! {At::Value => "created"}, "Sort by created"],
                 input_ev(Ev::Input, Msg::SortSelected)
             ],
-            table![channel_table(model.last_loaded, &channels_dai)]
+            table![channel_table(model.last_loaded, &{
+                let mut channels_dai: Vec<MarketChannel> = channels_dai.clone().cloned().collect();
+                match model.sort {
+                    ChannelSort::Deposit => {
+                        channels_dai.sort_by(|x, y| y.deposit_amount.cmp(&x.deposit_amount));
+                    }
+                    ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
+                    ChannelSort::Created => channels_dai.sort_by(|x, y| y.spec.created.cmp(&x.spec.created)),
+                }
+                channels_dai
+            })]
         ]
     ]
 }
