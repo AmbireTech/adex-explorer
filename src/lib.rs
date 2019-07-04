@@ -246,9 +246,9 @@ fn view(model: &Model) -> El<Msg> {
                 .balances
                 .keys()
                 .filter(|k| **k != x.creator)
-                .collect::<Vec<&String>>()
+                .collect::<Vec<_>>()
         })
-        .collect::<std::collections::HashSet<_>>();
+        .collect::<HashSet<_>>();
 
     div![
         card("Campaigns", &channels.len().to_string()),
