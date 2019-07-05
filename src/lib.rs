@@ -288,8 +288,9 @@ fn view(model: &Model) -> El<Msg> {
                         ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
                         ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
                     })
-                    .collect::<Vec<&MarketChannel>>()
-            )]
+                    .collect::<Vec<_>>()
+            )],
+            ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
         ]
     ]
 }
@@ -370,6 +371,45 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
         }]
     ]
 }
+
+fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Vec<El<Msg>> {
+    let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
+    for channel in channels.iter() {
+        for unit in channel.spec.ad_units.iter() {
+            units_by_type.entry(&unit.ad_type).or_insert(vec![]).push(channel);
+        }
+    }
+    let units_by_type_stats = units_by_type
+        .iter()
+        .map(|(ad_type, all)| {
+            let total_per_impression: BigNum = all.iter().map(|x| &x.spec.min_per_impression).sum();
+            // @TODO needs weighted avg
+            let avg_per_impression = total_per_impression.div_floor(&(all.len() as u64).into());
+            let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount).sum();
+            (ad_type, (avg_per_impression, total_vol))
+        })
+        .sorted_by(|y, x| (x.1).0.cmp(&(y.1).0))
+        .collect::<Vec<_>>();
+
+    let header = tr![
+        td!["Ad Size"],
+        td!["CPM"],
+        td!["Total volume"],
+    ];
+
+    std::iter::once(header)
+        .chain(units_by_type_stats.iter().map(|(ad_type, (avg_per_impression, total_vol))| {
+            tr![
+                td![ad_type],
+                td![dai_readable(
+                    &(avg_per_impression * &1000.into())
+                )],
+                td![dai_readable(&total_vol)],
+            ] 
+        }))
+        .collect::<Vec<El<Msg>>>()
+}
+
 
 fn image(url: &str) -> El<Msg> {
     if url.starts_with("ipfs://") {
