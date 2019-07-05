@@ -9,6 +9,9 @@ h2.impressions-rainbow {
 body {
   font-family: Arial;
 }
+table {
+  margin-bottom: 1em;
+}
 table td {
   padding: 0.5em 1.5em; 
 }

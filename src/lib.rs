@@ -238,6 +238,12 @@ fn view(model: &Model) -> El<Msg> {
         .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
         .sum();
 
+    let unique_units = &channels
+        .iter()
+        .flat_map(|x| &x.spec.ad_units)
+        .map(|x| &x.ipfs)
+        .collect::<HashSet<_>>();
+
     let unique_publishers = channels_dai
         .clone()
         .flat_map(|x| {
@@ -251,16 +257,7 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         card("Campaigns", &channels.len().to_string()),
-        card(
-            "Ad units",
-            &channels
-                .iter()
-                .flat_map(|x| &x.spec.ad_units)
-                .map(|x| &x.ipfs)
-                .collect::<HashSet<_>>()
-                .len()
-                .to_string()
-        ),
+        card("Ad units", &unique_units.len().to_string()),
         card("Total campaign deposits", &dai_readable(&total_deposit)),
         card("Paid out", &dai_readable(&total_paid)),
         // @TODO warn that this is an estimation; add a question mark next to it
@@ -282,7 +279,7 @@ fn view(model: &Model) -> El<Msg> {
                 option![attrs! {At::Value => "created"}, "Sort by created"],
                 input_ev(Ev::Input, Msg::SortSelected)
             ],
-            table![channel_table(
+            channel_table(
                 model.last_loaded,
                 &channels_dai
                     .clone()
@@ -291,8 +288,9 @@ fn view(model: &Model) -> El<Msg> {
                         ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
                         ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
                     })
-                    .collect::<Vec<&MarketChannel>>()
-            )]
+                    .collect::<Vec<_>>()
+            ),
+            ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
         ]
     ]
 }
@@ -305,7 +303,7 @@ fn card(label: &str, value: &str) -> El<Msg> {
     ]
 }
 
-fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Vec<El<Msg>> {
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -319,9 +317,11 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Vec<El<Msg>> 
         td!["Preview"]
     ];
 
-    std::iter::once(header)
+    let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
-        .collect::<Vec<El<Msg>>>()
+        .collect::<Vec<El<Msg>>>();
+
+    table![channels]
 }
 
 fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
@@ -373,6 +373,45 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
         }]
     ]
 }
+
+fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
+    let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
+    for channel in channels.iter() {
+        for unit in channel.spec.ad_units.iter() {
+            units_by_type.entry(&unit.ad_type).or_insert(vec![]).push(channel);
+        }
+    }
+    let units_by_type_stats = units_by_type
+        .iter()
+        .map(|(ad_type, all)| {
+            let total_per_impression: BigNum = all.iter().map(|x| &x.spec.min_per_impression).sum();
+            // @TODO needs weighted avg
+            let avg_per_impression = total_per_impression.div_floor(&(all.len() as u64).into());
+            let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount).sum();
+            (ad_type, avg_per_impression, total_vol)
+        })
+        .sorted_by(|x, y| y.1.cmp(&x.1))
+        .collect::<Vec<_>>();
+
+    let header = tr![
+        td!["Ad Size"],
+        td!["CPM"],
+        td!["Total volume"],
+    ];
+
+    table![std::iter::once(header)
+        .chain(units_by_type_stats.iter().map(|(ad_type, avg_per_impression, total_vol)| {
+            tr![
+                td![ad_type],
+                td![dai_readable(
+                    &(avg_per_impression * &1000.into())
+                )],
+                td![dai_readable(&total_vol)],
+            ] 
+        }))
+        .collect::<Vec<El<Msg>>>()]
+}
+
 
 fn image(url: &str) -> El<Msg> {
     if url.starts_with("ipfs://") {
