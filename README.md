@@ -20,7 +20,7 @@ on `127.0.0.0:8000`.
 
 ```
 git checkout gh-pages
-git merge rust
+git merge master
 cargo make create_wasm_release
 wasm-opt -Os -o pkg/package_bg.wasm pkg/package_bg.wasm
 git commit -am 'new release'
