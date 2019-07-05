@@ -279,7 +279,7 @@ fn view(model: &Model) -> El<Msg> {
                 option![attrs! {At::Value => "created"}, "Sort by created"],
                 input_ev(Ev::Input, Msg::SortSelected)
             ],
-            table![channel_table(
+            channel_table(
                 model.last_loaded,
                 &channels_dai
                     .clone()
@@ -289,7 +289,7 @@ fn view(model: &Model) -> El<Msg> {
                         ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
                     })
                     .collect::<Vec<_>>()
-            )],
+            ),
             ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
         ]
     ]
@@ -303,7 +303,7 @@ fn card(label: &str, value: &str) -> El<Msg> {
     ]
 }
 
-fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Vec<El<Msg>> {
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -317,9 +317,11 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Vec<El<Msg>> 
         td!["Preview"]
     ];
 
-    std::iter::once(header)
+    let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
-        .collect::<Vec<El<Msg>>>()
+        .collect::<Vec<El<Msg>>>();
+
+    table![channels]
 }
 
 fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
@@ -372,7 +374,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     ]
 }
 
-fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Vec<El<Msg>> {
+fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
     for channel in channels.iter() {
         for unit in channel.spec.ad_units.iter() {
@@ -397,7 +399,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Vec<El<Msg>> {
         td!["Total volume"],
     ];
 
-    std::iter::once(header)
+    table![std::iter::once(header)
         .chain(units_by_type_stats.iter().map(|(ad_type, avg_per_impression, total_vol)| {
             tr![
                 td![ad_type],
@@ -407,7 +409,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Vec<El<Msg>> {
                 td![dai_readable(&total_vol)],
             ] 
         }))
-        .collect::<Vec<El<Msg>>>()
+        .collect::<Vec<El<Msg>>>()]
 }
 
 
