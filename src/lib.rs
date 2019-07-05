@@ -386,9 +386,9 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Vec<El<Msg>> {
             // @TODO needs weighted avg
             let avg_per_impression = total_per_impression.div_floor(&(all.len() as u64).into());
             let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount).sum();
-            (ad_type, (avg_per_impression, total_vol))
+            (ad_type, avg_per_impression, total_vol)
         })
-        .sorted_by(|y, x| (x.1).0.cmp(&(y.1).0))
+        .sorted_by(|x, y| y.1.cmp(&x.1))
         .collect::<Vec<_>>();
 
     let header = tr![
@@ -398,7 +398,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Vec<El<Msg>> {
     ];
 
     std::iter::once(header)
-        .chain(units_by_type_stats.iter().map(|(ad_type, (avg_per_impression, total_vol))| {
+        .chain(units_by_type_stats.iter().map(|(ad_type, avg_per_impression, total_vol)| {
             tr![
                 td![ad_type],
                 td![dai_readable(
