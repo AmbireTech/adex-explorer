@@ -1,34 +1,27 @@
 #[macro_use]
 extern crate seed;
+
+use std::collections::HashMap;
+
+use adex_domain::{BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use futures::Future;
-use num::bigint::BigUint;
-use num::integer::Integer;
-use num::traits::ToPrimitive;
+use lazysort::*;
 use num_format::{Locale, ToFormattedString};
 use seed::prelude::*;
 use seed::{Method, Request};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
-mod ad_unit;
-use ad_unit::*;
-mod targeting_tag;
-use targeting_tag::*;
-mod validator;
-use validator::*;
-mod event_submission;
-use event_submission::*;
-mod channel;
-use channel::*;
-
-mod bignum;
-use bignum::*;
-
-const MARKET_URL: &str = "https://market.adex.network/campaigns?all";
+const MARKET_URL: &str = "https://market.adex.network";
+const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
+const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
+const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
-const UPDATE_MS: i32 = 30000;
+const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
+const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
+const REFRESH_MS: i32 = 10000;
 
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -46,12 +39,6 @@ pub enum MarketStatusType {
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-struct Spec {
-    min_per_impression: BigNum,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 struct MarketStatus {
     #[serde(rename = "name")]
     pub status_type: MarketStatusType,
@@ -62,18 +49,25 @@ struct MarketStatus {
     pub last_checked: DateTime<Utc>,
 }
 impl MarketStatus {
-    fn balances_sum(&self) -> BigUint {
-        self.balances.iter().map(|(_, v)| &v.0).sum()
+    fn balances_sum(&self) -> BigNum {
+        self.balances.iter().map(|(_, v)| v).sum()
     }
 }
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 struct MarketChannel {
     pub id: String,
+    pub creator: String,
     pub deposit_asset: String,
     pub deposit_amount: BigNum,
     pub status: MarketStatus,
     pub spec: ChannelSpec,
+}
+
+// Etherscan API
+#[derive(Deserialize, Clone, Debug)]
+struct EtherscanBalResp {
+    pub result: BigNum,
 }
 
 // Model
@@ -81,27 +75,112 @@ enum Loadable<T> {
     Loading,
     Ready(T),
 }
+impl<T> Default for Loadable<T> {
+    fn default() -> Self {
+        Loadable::Loading
+    }
+}
+
+#[derive(Clone, Copy)]
 enum ChannelSort {
     Deposit,
     Status,
+    Created,
 }
-struct Model {
-    pub channels: Loadable<Vec<MarketChannel>>,
-    pub sort: ChannelSort,
-}
-impl Default for Model {
+impl Default for ChannelSort {
     fn default() -> Self {
-        Model {
-            channels: Loadable::Loading,
-            sort: ChannelSort::Deposit,
+        ChannelSort::Deposit
+    }
+}
+// @TODO can we derive this automatically
+impl From<String> for ChannelSort {
+    fn from(sort_name: String) -> Self {
+        match &sort_name as &str {
+            "deposit" => ChannelSort::Deposit,
+            "status" => ChannelSort::Status,
+            "created" => ChannelSort::Created,
+            _ => ChannelSort::default(),
         }
     }
 }
 
+#[derive(Default)]
+struct Model {
+    pub load_action: ActionLoad,
+    pub sort: ChannelSort,
+    // Market channels & balance: for the summaries page
+    pub market_channels: Loadable<Vec<MarketChannel>>,
+    pub balance: Loadable<EtherscanBalResp>,
+    // Current selected channel: for ChannelDetail
+    pub channel: Loadable<Channel>,
+    pub last_loaded: i64,
+}
+
 // Update
 #[derive(Clone)]
+enum ActionLoad {
+    // The summary includes latest campaigns on the market,
+    // and some on-chain data (e.g. DAI balance on core SC)
+    Summary,
+    // The channel detail contains a summary of what validator knows about a channel
+    ChannelDetail(String),
+}
+impl Default for ActionLoad {
+    fn default() -> Self {
+        ActionLoad::Summary
+    }
+}
+impl ActionLoad {
+    fn perform_effects(&self, orders: &mut Orders<Msg>) {
+        match self {
+            ActionLoad::Summary => {
+                // Load on-chain balances
+                let etherscan_uri = format!(
+                    "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
+                    ETHERSCAN_URL,
+                    DAI_ADDR,
+                    CORE_ADDR,
+                    ETHERSCAN_API_KEY
+                );
+                orders.perform_cmd(
+                    Request::new(&etherscan_uri)
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::BalanceLoaded)
+                        .map_err(Msg::OnFetchErr),
+                );
+
+                // Load campaigns from the market
+                // @TODO request DAI channels only
+                orders.perform_cmd(
+                    Request::new(&format!("{}/campaigns?all", MARKET_URL))
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::ChannelsLoaded)
+                        .map_err(Msg::OnFetchErr),
+                );
+            }
+            // NOTE: not used yet
+            ActionLoad::ChannelDetail(id) => {
+                let market_uri = format!(
+                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
+                    MARKET_URL,
+                    &id,
+                    // @TODO get rid of this default earner thing, it's very very temporary
+                    // we should get an aggr of all earners
+                    DEFAULT_EARNER
+                );
+                // @TODO
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 enum Msg {
-    LoadCampaigns,
+    Load(ActionLoad),
+    Refresh,
+    BalanceLoaded(EtherscanBalResp),
     ChannelsLoaded(Vec<MarketChannel>),
     OnFetchErr(JsValue),
     SortSelected(String),
@@ -109,28 +188,33 @@ enum Msg {
 
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
     match msg {
-        Msg::LoadCampaigns => {
-            let order = Request::new(MARKET_URL)
-                .method(Method::Get)
-                .fetch_json()
-                .map(Msg::ChannelsLoaded)
-                .map_err(Msg::OnFetchErr);
-            orders.skip().perform_cmd(order);
+        Msg::Load(load_action) => {
+            // Do not render
+            orders.skip();
+            // Perform the effects
+            load_action.perform_effects(orders);
+            // This can be used on refresh
+            model.load_action = load_action;
         }
-        Msg::ChannelsLoaded(channels) => model.channels = Loadable::Ready(channels),
+        Msg::Refresh => {
+            orders.skip();
+            model.load_action.perform_effects(orders);
+        }
+        Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
+        Msg::ChannelsLoaded(channels) => {
+            model.market_channels = Loadable::Ready(channels);
+            model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+        }
+        Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
+        // report via a toast
         Msg::OnFetchErr(_) => (),
-        Msg::SortSelected(sort_name) => match &sort_name as &str {
-            "deposit" => model.sort = ChannelSort::Deposit,
-            "status" => model.sort = ChannelSort::Status,
-            _ => (),
-        },
     }
 }
 
 // View
 fn view(model: &Model) -> El<Msg> {
-    let channels = match &model.channels {
+    let channels = match &model.market_channels {
         Loadable::Loading => return h2!["Loading..."],
         Loadable::Ready(c) => c,
     };
@@ -138,77 +222,110 @@ fn view(model: &Model) -> El<Msg> {
     let total_impressions: u64 = channels
         .iter()
         .map(|x| {
-            (&x.status.balances_sum() / &x.spec.min_per_impression.0)
+            (&x.status.balances_sum() / &x.spec.min_per_impression)
                 .to_u64()
                 .unwrap_or(0)
         })
         .sum();
 
-    // @TODO we can make a special type for DAI channels and that way shield ourselves of
-    // rendering wrongly
-    let mut channels_dai: Vec<MarketChannel> = channels
+    let channels_dai = channels
         .iter()
-        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR)
-        .cloned()
-        .collect();
+        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
 
-    let total_paid: BigUint = channels_dai.iter().map(|x| x.status.balances_sum()).sum();
-
-    match model.sort {
-        ChannelSort::Deposit => {
-            channels_dai.sort_by(|x, y| y.deposit_amount.0.cmp(&x.deposit_amount.0));
-        }
-        ChannelSort::Status => channels_dai.sort_by_key(|x| x.status.status_type.clone()),
-    }
-
-    let total_deposit: BigUint = channels_dai
-        .iter()
-        .map(|MarketChannel { deposit_amount, .. }| &deposit_amount.0)
+    let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
+    let total_deposit = channels_dai
+        .clone()
+        .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
         .sum();
 
+    let unique_publishers = channels_dai
+        .clone()
+        .flat_map(|x| {
+            x.status
+                .balances
+                .keys()
+                .filter(|k| **k != x.creator)
+                .collect::<Vec<_>>()
+        })
+        .collect::<HashSet<_>>();
+
     div![
-        h2![format!(
-            "Total campaign deposits: {}",
-            dai_readable(&total_deposit)
-        )],
-        h2![format!("Total paid: {}", dai_readable(&total_paid))],
-        h2![
-            //attrs!{ At::Class => "impressions-rainbow" },
-            format!(
-                "Total impressions: {}",
-                total_impressions.to_formatted_string(&Locale::en)
-            )
-        ],
-        select![
-            attrs! {At::Value => "deposit"},
-            option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
-            option![attrs! {At::Value => "status"}, "Sort by status"],
-            input_ev(Ev::Input, Msg::SortSelected)
-        ],
-        table![view_channel_table(&channels_dai)]
+        card("Campaigns", &channels.len().to_string()),
+        card(
+            "Ad units",
+            &channels
+                .iter()
+                .flat_map(|x| &x.spec.ad_units)
+                .map(|x| &x.ipfs)
+                .collect::<HashSet<_>>()
+                .len()
+                .to_string()
+        ),
+        card("Total campaign deposits", &dai_readable(&total_deposit)),
+        card("Paid out", &dai_readable(&total_paid)),
+        // @TODO warn that this is an estimation; add a question mark next to it
+        // to explain what an estimation means
+        card(
+            "Impressions",
+            &total_impressions.to_formatted_string(&Locale::en)
+        ),
+        card("Publishers", &unique_publishers.len().to_string()),
+        match &model.balance {
+            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
+            _ => seed::empty(),
+        },
+        div![
+            select![
+                attrs! {At::Value => "deposit"},
+                option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
+                option![attrs! {At::Value => "status"}, "Sort by status"],
+                option![attrs! {At::Value => "created"}, "Sort by created"],
+                input_ev(Ev::Input, Msg::SortSelected)
+            ],
+            table![channel_table(
+                model.last_loaded,
+                &channels_dai
+                    .clone()
+                    .sorted_by(|x, y| match model.sort {
+                        ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                        ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                        ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                    })
+                    .collect::<Vec<&MarketChannel>>()
+            )]
+        ]
     ]
 }
 
-fn view_channel_table(channels: &[MarketChannel]) -> Vec<El<Msg>> {
-    let rows = channels.iter().map(view_channel);
+fn card(label: &str, value: &str) -> El<Msg> {
+    div![
+        class!["card"],
+        div![class!["card-value"], value],
+        div![class!["card-label"], label],
+    ]
+}
 
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Vec<El<Msg>> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
         td!["Deposit"],
+        td!["CPM"],
         td!["Paid"],
         td!["Paid - %"],
         td!["Status"],
-        td!["Last updated"],
+        td!["Created"],
+        //td!["Last updated"],
+        td!["Preview"]
     ];
 
     std::iter::once(header)
-        .chain(rows)
+        .chain(channels.iter().map(|c| channel(last_loaded, c)))
         .collect::<Vec<El<Msg>>>()
 }
 
-fn view_channel(channel: &MarketChannel) -> El<Msg> {
-    let deposit_amount = &channel.deposit_amount.0;
+fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
+    let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
         "{}/channel/{}/status",
@@ -216,50 +333,92 @@ fn view_channel(channel: &MarketChannel) -> El<Msg> {
         channel.id
     );
     let id_prefix = channel.id.chars().take(6).collect::<String>();
+    // This has a tiny issue: when you go back to the explorer after being in another window,
+    // stuff will be not-recent until we get the latest status
     tr![
+        class!(
+            if last_loaded - channel.status.last_checked.timestamp() > 180 {
+                "not-recent"
+            } else {
+                "recent"
+            }
+        ),
         td![a![
             attrs! {At::Href => url; At::Target => "_blank"},
             id_prefix
         ]],
         td![format!("${:.2}", &channel.status.usd_estimate)],
         td![dai_readable(&deposit_amount)],
+        td![dai_readable(
+            &(&channel.spec.min_per_impression * &1000.into())
+        )],
         td![dai_readable(&paid_total)],
         td![{
-            let base = 100000u32;
-            let paid_units = (paid_total * base).div_floor(deposit_amount);
+            let base = 100000_u64;
+            let paid_units = (&paid_total * &base.into()).div_floor(deposit_amount);
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
         }],
         td![format!("{:?}", &channel.status.status_type)],
-        td![{
-            let last_checked = &channel.status.last_checked.timestamp();
-            let time_diff = (js_sys::Date::now() as i64) / 1000 - last_checked;
-            match time_diff {
-                x if x < 0 => format!("just now"),
-                x if x < 60 => format!("{} seconds ago", x),
-                x if x < 3600 => format!("{} minutes ago", x / 60),
-                _ => format!("{}", channel.status.last_checked.format("%Y-%m-%d %T")),
+        td![time_diff(last_loaded, &channel.spec.created)],
+        //td![time(&channel.status.last_checked)],
+        td![class!["preview"], {
+            match channel.spec.ad_units.get(0) {
+                Some(unit) => a![
+                    attrs! { At::Href => &unit.target_url; At::Target => "_blank" },
+                    image(&unit.media_url)
+                ],
+                None => seed::empty(),
             }
         }]
     ]
 }
-fn dai_readable(bal: &BigUint) -> String {
-    // 10 ** 16
+
+fn image(url: &str) -> El<Msg> {
+    if url.starts_with("ipfs://") {
+        img![attrs! { At::Src => url.replace("ipfs://", IPFS_GATEWAY) }]
+    } else {
+        img![attrs! { At::Src => url }]
+    }
+}
+
+fn time_diff(now_seconds: i64, t: &DateTime<Utc>) -> String {
+    let time_diff = now_seconds - t.timestamp();
+    match time_diff {
+        x if x < 0 => format!("just now"),
+        x if x < 60 => format!("{} seconds ago", x),
+        x if x < 3600 => format!("{} minutes ago", x / 60),
+        x if x < 86400 => format!("{} hours ago", x / 3600),
+        _ => format!("{}", t.format("%Y-%m-%d")), // %T if we want time
+    }
+}
+
+fn dai_readable(bal: &BigNum) -> String {
+    // 10 ** 16`
     match bal.div_floor(&10_000_000_000_000_000u64.into()).to_f64() {
         Some(hundreds) => format!("{:.2} DAI", hundreds / 100.0),
         None => ">max".to_owned(),
     }
 }
 
+// Router
+fn routes(url: &seed::Url) -> Msg {
+    match url.path.get(0).map(|x| x.as_ref()) {
+        Some("channel") => match url.path.get(1) {
+            Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
+            None => Msg::Load(ActionLoad::Summary),
+        },
+        _ => Msg::Load(ActionLoad::Summary),
+    }
+}
+
 #[wasm_bindgen]
 pub fn render() {
     let state = seed::App::build(Model::default(), update, view)
+        .routes(routes)
         .finish()
         .run();
 
-    state.update(Msg::LoadCampaigns);
-    seed::set_interval(
-        Box::new(move || state.update(Msg::LoadCampaigns)),
-        UPDATE_MS,
-    );
+    state.update(Msg::Load(ActionLoad::Summary));
+    seed::set_interval(Box::new(move || state.update(Msg::Refresh)), REFRESH_MS);
 }

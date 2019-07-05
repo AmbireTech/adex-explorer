@@ -11,6 +11,18 @@
 
 `cargo install --force cargo-make`
 
+`curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh`
+
 Run `cargo make all` in a terminal to build the app, and `cargo make serve` to start a dev server
 on `127.0.0.0:8000`.
 
+## publish to github pages
+
+```
+git checkout gh-pages
+git merge rust
+cargo make create_wasm_release
+wasm-opt -Os -o pkg/package_bg.wasm pkg/package_bg.wasm
+git commit -am 'new release'
+git push
+```
