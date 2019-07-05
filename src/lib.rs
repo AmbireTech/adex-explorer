@@ -151,6 +151,7 @@ impl ActionLoad {
                 );
 
                 // Load campaigns from the market
+                // @TODO request DAI channels only
                 orders.perform_cmd(
                     Request::new(&format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
@@ -227,8 +228,6 @@ fn view(model: &Model) -> El<Msg> {
         })
         .sum();
 
-    // @TODO we can make a special type for DAI channels and that way shield ourselves of
-    // rendering wrongly
     let channels_dai = channels
         .iter()
         .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
