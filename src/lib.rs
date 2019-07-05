@@ -238,6 +238,12 @@ fn view(model: &Model) -> El<Msg> {
         .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
         .sum();
 
+    let unique_units = &channels
+        .iter()
+        .flat_map(|x| &x.spec.ad_units)
+        .map(|x| &x.ipfs)
+        .collect::<HashSet<_>>();
+
     let unique_publishers = channels_dai
         .clone()
         .flat_map(|x| {
@@ -251,16 +257,7 @@ fn view(model: &Model) -> El<Msg> {
 
     div![
         card("Campaigns", &channels.len().to_string()),
-        card(
-            "Ad units",
-            &channels
-                .iter()
-                .flat_map(|x| &x.spec.ad_units)
-                .map(|x| &x.ipfs)
-                .collect::<HashSet<_>>()
-                .len()
-                .to_string()
-        ),
+        card("Ad units", &unique_units.len().to_string()),
         card("Total campaign deposits", &dai_readable(&total_deposit)),
         card("Paid out", &dai_readable(&total_paid)),
         // @TODO warn that this is an estimation; add a question mark next to it
