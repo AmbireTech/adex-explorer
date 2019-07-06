@@ -3,7 +3,7 @@ extern crate seed;
 
 use std::collections::HashMap;
 
-use adex_domain::{BigNum, Channel, ChannelSpec};
+use adex_domain::{BigNum, Channel, ChannelSpec, AdUnit};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use futures::Future;
@@ -366,7 +366,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
             match channel.spec.ad_units.get(0) {
                 Some(unit) => a![
                     attrs! { At::Href => &unit.target_url; At::Target => "_blank" },
-                    image(&unit.media_url)
+                    unit_preview(&unit)
                 ],
                 None => seed::empty(),
             }
@@ -413,8 +413,12 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
 }
 
 
-fn image(url: &str) -> El<Msg> {
-    img![attrs! { At::Src => to_http_url(url) }]
+fn unit_preview(unit: &AdUnit) -> El<Msg> {
+    if unit.media_mime.starts_with("video/") {
+        video![attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true }]
+    } else {
+        img![attrs! { At::Src => to_http_url(&unit.media_url) }]
+    }
 }
 
 fn to_http_url(url: &str) -> String {

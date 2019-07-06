@@ -48,7 +48,7 @@ table tr.full {
   padding: 0px;
   text-align: center;
 }
-.preview img {
+.preview img, .preview video {
   max-width: 110px;
   max-height: 30px;
 }
