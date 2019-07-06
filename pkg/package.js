@@ -563,7 +563,7 @@ __exports.__wbg_new_7884206509213d02 = function(arg0, arg1) {
         }
 
     };
-    cbarg0.f = wasm.__wbg_function_table.get(192);
+    cbarg0.f = wasm.__wbg_function_table.get(193);
     cbarg0.a = arg0;
     cbarg0.b = arg1;
     try {
@@ -733,9 +733,9 @@ __exports.__wbindgen_closure_wrapper203 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper572 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(144);
-    const d = wasm.__wbg_function_table.get(145);
+__exports.__wbindgen_closure_wrapper574 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(145);
+    const d = wasm.__wbg_function_table.get(146);
     const cb = function() {
         this.cnt++;
         try {
@@ -754,9 +754,9 @@ real.original = cb;
 return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper848 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(166);
-    const d = wasm.__wbg_function_table.get(167);
+__exports.__wbindgen_closure_wrapper850 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(167);
+    const d = wasm.__wbg_function_table.get(168);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
