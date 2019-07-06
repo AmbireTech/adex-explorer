@@ -414,10 +414,14 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
 
 
 fn image(url: &str) -> El<Msg> {
+    img![attrs! { At::Src => to_http_url(url) }]
+}
+
+fn to_http_url(url: &str) -> String {
     if url.starts_with("ipfs://") {
-        img![attrs! { At::Src => url.replace("ipfs://", IPFS_GATEWAY) }]
+        url.replace("ipfs://", IPFS_GATEWAY)
     } else {
-        img![attrs! { At::Src => url }]
+        url.to_owned()
     }
 }
 
