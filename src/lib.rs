@@ -415,7 +415,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
 
 fn unit_preview(unit: &AdUnit) -> El<Msg> {
     if unit.media_mime.starts_with("video/") {
-        video![attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true }]
+        video![attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true }]
     } else {
         img![attrs! { At::Src => to_http_url(&unit.media_url) }]
     }
