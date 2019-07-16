@@ -352,16 +352,16 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
             let len = points.len() as u64;
             let chart: El<Msg> = svg![
                 attrs!{
-                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px; opacity: 0.5;";
+                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px; opacity: 0.1;";
                     At::Width => format!("{}px", width);
                     At::Height => format!("{}px", height);
-                    At::ViewBox => format!("0 0 {} {}", points.len(), height);
+                    At::ViewBox => format!("{} 0 {} {}", len, len, height);
                 },
                 polyline![
                     attrs!{
                         At::Fill => "none";
-                        At::Custom("stroke".into()) => "#0074d9";
-                        At::Custom("stroke-width".into()) => "3";
+                        At::Custom("stroke".into()) => "#0074d9"; // #c8dbec
+                        At::Custom("stroke-width".into()) => "5";
                         At::Custom("points".into()) => points
                             .iter()
                             .enumerate()
