@@ -282,15 +282,16 @@ fn view(model: &Model) -> El<Msg> {
     div![
         card("Campaigns", &channels.len().to_string()),
         card("Ad units", &unique_units.len().to_string()),
-        card("Total campaign deposits", &dai_readable(&total_deposit)),
-        card("Paid out", &dai_readable(&total_paid)),
-        // @TODO warn that this is an estimation; add a question mark next to it
-        // to explain what an estimation means
+        card("Publishers", &unique_publishers.len().to_string()),
         card(
             "Impressions",
             &total_impressions.to_formatted_string(&Locale::en)
         ),
-        card("Publishers", &unique_publishers.len().to_string()),
+        br![],
+        card("Total campaign deposits", &dai_readable(&total_deposit)),
+        card("Paid out", &dai_readable(&total_paid)),
+        // @TODO warn that this is an estimation; add a question mark next to it
+        // to explain what an estimation means
         match &model.balance {
             Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
             _ => seed::empty(),
@@ -350,7 +351,7 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
                 )
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
-            let chart: El<Msg> = svg![
+            let chart = svg![
                 attrs!{
                     At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
                     At::Width => format!("{}px", width);
