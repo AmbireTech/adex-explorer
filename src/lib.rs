@@ -393,7 +393,7 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
         td!["CPM"],
         td!["Paid"],
         td!["Paid - %"],
-        td!["Max impressions"],
+        //td!["Max impressions"],
         td!["Status"],
         td!["Created"],
         //td!["Last updated"],
@@ -442,12 +442,12 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
         }],
-        td![
-            (deposit_amount / &channel.spec.min_per_impression)
-                .to_u64()
-                .unwrap_or(0)
-                .to_formatted_string(&Locale::en)
-        ],
+        //td![
+        //    (deposit_amount / &channel.spec.min_per_impression)
+        //        .to_u64()
+        //        .unwrap_or(0)
+        //        .to_formatted_string(&Locale::en)
+        //],
         td![format!("{:?}", &channel.status.status_type)],
         td![time_diff(last_loaded, &channel.spec.created)],
         //td![time_diff(last_loaded, &channel.status.last_checked)],
