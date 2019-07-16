@@ -305,23 +305,26 @@ fn card(label: &str, value: &str) -> El<Msg> {
 
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
     let header = tr![
-        td!["URL"],
+        td!["URL", class!["mdl-data-table__cell--non-numeric"]],
         td!["USD estimate"],
         td!["Deposit"],
         td!["CPM"],
         td!["Paid"],
         td!["Paid - %"],
-        td!["Status"],
-        td!["Created"],
+        td!["Status", class!["mdl-data-table__cell--non-numeric"]],
+        td!["Created", class!["mdl-data-table__cell--non-numeric"]],
         //td!["Last updated"],
-        td!["Preview"]
+        td!["Preview", class!["mdl-data-table__cell--non-numeric"]]
     ];
 
     let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
         .collect::<Vec<El<Msg>>>();
 
-    table![channels]
+    table![
+        class!["mdl-data-table", "mdl-js-data-table", "mdl-data-table--selectable", "mdl-shadow--2dp"],
+        channels
+    ]
 }
 
 fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
@@ -346,7 +349,8 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
         td![a![
             attrs! {At::Href => url; At::Target => "_blank"},
             id_prefix
-        ]],
+        ], 
+        class!["mdl-data-table__cell--non-numeric"]],
         td![format!("${:.2}", &channel.status.usd_estimate)],
         td![dai_readable(&deposit_amount)],
         td![dai_readable(
@@ -359,10 +363,12 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
         }],
-        td![format!("{:?}", &channel.status.status_type)],
-        td![time_diff(last_loaded, &channel.spec.created)],
+        td![format!("{:?}", &channel.status.status_type),
+            class!["mdl-data-table__cell--non-numeric"]],
+        td![time_diff(last_loaded, &channel.spec.created),
+            class!["mdl-data-table__cell--non-numeric"]],
         //td![time(&channel.status.last_checked)],
-        td![class!["preview"], {
+        td![class!["preview", "mdl-data-table__cell--non-numeric"], {
             match channel.spec.ad_units.get(0) {
                 Some(unit) => a![
                     attrs! { At::Href => &unit.target_url; At::Target => "_blank" },
