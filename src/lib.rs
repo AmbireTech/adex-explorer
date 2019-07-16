@@ -340,7 +340,7 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
     match (min, max) {
         (Some(min), Some(max)) => {
             let range = max - min;
-            let width = 280_u64;
+            let width = 250_u64;
             let height = 60_u64;
             let points = values.clone()
                 .map(|v| (&(v - min) * &height.into())
@@ -352,16 +352,16 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
             let len = points.len() as u64;
             let chart: El<Msg> = svg![
                 attrs!{
-                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px; opacity: 0.1;";
+                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
                     At::Width => format!("{}px", width);
                     At::Height => format!("{}px", height);
-                    At::ViewBox => format!("{} 0 {} {}", len, len, height);
+                    At::ViewBox => format!("0 0 {} {}", width, height);
                 },
                 polyline![
                     attrs!{
                         At::Fill => "none";
-                        At::Custom("stroke".into()) => "#0074d9"; // #c8dbec
-                        At::Custom("stroke-width".into()) => "5";
+                        At::Custom("stroke".into()) => "#c8dbec";
+                        At::Custom("stroke-width".into()) => "4";
                         At::Custom("points".into()) => points
                             .iter()
                             .enumerate()
