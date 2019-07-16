@@ -337,13 +337,11 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
     let max = values.clone().max();
     match (min, max) {
         (Some(min), Some(max)) => {
-            /*
             let range = max - min;
             let base = 1000_u64;
             let points = values.clone()
-                .map(|v| ((v - min) * &base.into()).div_floor(range))
+                .map(|v| (&(v - min) * &base.into()).div_floor(&range))
                 .collect::<Vec<_>>();
-            */
         },
         // no values, so we can't generate points
         _ => ()
@@ -377,7 +375,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     let paid_total = channel.status.balances_sum();
     let url = format!(
         "{}/channel/{}/status",
-        channel.spec.validators.get(0).map_or("", |v| &v.url),
+        &channel.spec.validators.leader().url,
         channel.id
     );
     let id_prefix = channel.id.chars().take(6).collect::<String>();
