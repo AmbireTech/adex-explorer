@@ -338,10 +338,32 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
     match (min, max) {
         (Some(min), Some(max)) => {
             let range = max - min;
-            let base = 1000_u64;
+            let base = 100_u64;
             let points = values.clone()
-                .map(|v| (&(v - min) * &base.into()).div_floor(&range))
+                .map(|v| (&(v - min) * &base.into())
+                     .div_floor(&range)
+                     .to_u64()
+                     .unwrap_or(0)
+                )
                 .collect::<Vec<_>>();
+            return svg![
+                attrs!{
+                    At::Width => "300px";
+                    At::Height => "100px";
+                    At::ViewBox => format!("0 0 {} {}", points.len(), base);
+                },
+                polyline![
+                    attrs!{
+                        At::Custom("stroke".into()) => "#0074d9";
+                        At::Custom("points".into()) => points
+                            .iter()
+                            .enumerate()
+                            .map(|(i, p)| format!("{},{}", i, base-p))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    }
+                ],
+            ]
         },
         // no values, so we can't generate points
         _ => ()
