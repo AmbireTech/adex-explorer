@@ -15,6 +15,7 @@ use serde::Deserialize;
 use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
+const VOLUME_URL: &str = "https://tom.adex.network/volume";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
@@ -64,6 +65,17 @@ struct MarketChannel {
     pub spec: ChannelSpec,
 }
 
+// Volume response from the validator
+#[derive(Deserialize, Clone, Debug)]
+struct VolumeResp {
+    pub aggr: Vec<VolDataPoint>
+}
+#[derive(Deserialize, Clone, Debug)]
+struct VolDataPoint {
+    pub value: BigNum,
+    pub time: DateTime<Utc>,
+}
+
 // Etherscan API
 #[derive(Deserialize, Clone, Debug)]
 struct EtherscanBalResp {
@@ -111,6 +123,7 @@ struct Model {
     // Market channels & balance: for the summaries page
     pub market_channels: Loadable<Vec<MarketChannel>>,
     pub balance: Loadable<EtherscanBalResp>,
+    pub volume: Loadable<VolumeResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -159,6 +172,15 @@ impl ActionLoad {
                         .map(Msg::ChannelsLoaded)
                         .map_err(Msg::OnFetchErr),
                 );
+
+                // Load volume
+                orders.perform_cmd(
+                    Request::new(&VOLUME_URL)
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::VolumeLoaded)
+                        .map_err(Msg::OnFetchErr),
+                );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
@@ -182,6 +204,7 @@ enum Msg {
     Refresh,
     BalanceLoaded(EtherscanBalResp),
     ChannelsLoaded(Vec<MarketChannel>),
+    VolumeLoaded(VolumeResp),
     OnFetchErr(JsValue),
     SortSelected(String),
 }
@@ -205,6 +228,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             model.market_channels = Loadable::Ready(channels);
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
+        Msg::VolumeLoaded(vol) => model.volume = Loadable::Ready(vol),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
@@ -269,6 +293,12 @@ fn view(model: &Model) -> El<Msg> {
         card("Publishers", &unique_publishers.len().to_string()),
         match &model.balance {
             Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
+            _ => seed::empty(),
+        },
+        match &model.volume {
+            Loadable::Ready(vol) => card("24h volume", &dai_readable(
+                &vol.aggr.iter().map(|x| &x.value).sum()
+            )),
             _ => seed::empty(),
         },
         div![
