@@ -333,42 +333,55 @@ fn card(label: &str, value: &str) -> El<Msg> {
 
 fn volume_card(vol: &VolumeResp) -> El<Msg> {
     let values = vol.aggr.iter().map(|x| &x.value);
+    let card_label = "24h volume";
+    let card_value = dai_readable(&values.clone().sum());
     let min = values.clone().min();
     let max = values.clone().max();
     match (min, max) {
         (Some(min), Some(max)) => {
             let range = max - min;
-            let base = 100_u64;
+            let width = 280_u64;
+            let height = 60_u64;
             let points = values.clone()
-                .map(|v| (&(v - min) * &base.into())
+                .map(|v| (&(v - min) * &height.into())
                      .div_floor(&range)
                      .to_u64()
                      .unwrap_or(0)
                 )
                 .collect::<Vec<_>>();
-            return svg![
+            let len = points.len() as u64;
+            let chart: El<Msg> = svg![
                 attrs!{
-                    At::Width => "300px";
-                    At::Height => "100px";
-                    At::ViewBox => format!("0 0 {} {}", points.len(), base);
+                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px; opacity: 0.5;";
+                    At::Width => format!("{}px", width);
+                    At::Height => format!("{}px", height);
+                    At::ViewBox => format!("0 0 {} {}", points.len(), height);
                 },
                 polyline![
                     attrs!{
+                        At::Fill => "none";
                         At::Custom("stroke".into()) => "#0074d9";
+                        At::Custom("stroke-width".into()) => "3";
                         At::Custom("points".into()) => points
                             .iter()
                             .enumerate()
-                            .map(|(i, p)| format!("{},{}", i, base-p))
+                            .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
                             .collect::<Vec<_>>()
                             .join(" ")
                     }
                 ],
-            ]
+            ];
+            return div![
+                class!["card chart"],
+                chart,
+                div![class!["card-value"], card_value],
+                div![class!["card-label"], card_label],
+            ];
         },
         // no values, so we can't generate points
         _ => ()
     }
-    card("24h volume", &dai_readable(&values.clone().sum()))
+    card(card_label, &card_value)
 }
 
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
