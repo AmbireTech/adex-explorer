@@ -120,7 +120,7 @@ dependencies = [
 [[package]]
 name = "domain"
 version = "0.1.0"
-source = "git+https://github.com/AdExNetwork/adex-validator-stack-rust.git#32bb3dc84c4c8a5f75c14a2a130588e8c647c8d1"
+source = "git+https://github.com/AdExNetwork/adex-validator-stack-rust.git#c72a5193d370582b11f3eb5816ca11b4462a9762"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",

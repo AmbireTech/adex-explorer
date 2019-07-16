@@ -38,10 +38,16 @@ table tr.full {
 }
 .card-label {
   font-size: 1em;
+  position: relative;
 }
 .card-value {
   color: rgb(0, 49, 89);
   font-size: 2em;
+  position: relative;
+}
+.card.chart {
+  position: relative;
+  width: 220px;
 }
 .preview {
   margin: 0px;
