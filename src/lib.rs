@@ -300,25 +300,49 @@ fn view(model: &Model) -> El<Msg> {
             _ => seed::empty(),
         },
         div![
-            select![
-                attrs! {At::Value => "deposit"},
-                option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
-                option![attrs! {At::Value => "status"}, "Sort by status"],
-                option![attrs! {At::Value => "created"}, "Sort by created"],
-                input_ev(Ev::Input, Msg::SortSelected)
+            class!["mdl-tabs", "mdl-js-tabs", "mdl-js-ripple-effect"],
+            div![
+                class!["mdl-tabs__tab-bar"],
+                a![
+                    class!["mdl-tabs__tab", "is-active"],
+                    attrs!{At::Href => "#channels-panel"},
+                    "Campaigns"
+                ],
+                 a![
+                    class!["mdl-tabs__tab", "is-active"],
+                    attrs!{At::Href => "#units-stats-panel"},
+                    "Units statistics"
+                ],
             ],
-            channel_table(
-                model.last_loaded,
-                &channels_dai
-                    .clone()
-                    .sorted_by(|x, y| match model.sort {
-                        ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
-                        ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
-                        ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
-                    })
-                    .collect::<Vec<_>>()
-            ),
-            ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
+            div![
+                id!{"channels-panel"},
+                class!["mdl-tabs__panel", "is-active"],
+                vec![
+                    select![
+                        attrs! {At::Value => "deposit"},
+                        option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
+                        option![attrs! {At::Value => "status"}, "Sort by status"],
+                        option![attrs! {At::Value => "created"}, "Sort by created"],
+                        input_ev(Ev::Input, Msg::SortSelected)
+                    ],
+                    channel_table(
+                        model.last_loaded,
+                        &channels_dai
+                            .clone()
+                            .sorted_by(|x, y| match model.sort {
+                                ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                                ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                                ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                            })
+                            .collect::<Vec<_>>()
+                    ),
+                ]
+            ],
+            div![
+                id!{"units-stats-panel"},
+                class!["mdl-tabs__panel"],
+                ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
+            ]
         ]
     ]
 }
@@ -481,15 +505,16 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
         .collect::<Vec<_>>();
 
     let header = tr![
-        td!["Ad Size"],
+        td!["Ad Size", class!["mdl-data-table__cell--non-numeric"]],
         td!["CPM"],
         td!["Total volume"],
     ];
 
-    table![std::iter::once(header)
+    table![class!["mdl-data-table", "mdl-js-data-table", "mdl-data-table--selectable", "mdl-shadow--2dp"],
+        std::iter::once(header)
         .chain(units_by_type_stats.iter().map(|(ad_type, avg_per_impression, total_vol)| {
             tr![
-                td![ad_type],
+                td![ad_type, class!["mdl-data-table__cell--non-numeric"]],
                 td![dai_readable(
                     &(avg_per_impression * &1000.into())
                 )],
