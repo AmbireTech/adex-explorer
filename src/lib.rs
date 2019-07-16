@@ -282,15 +282,16 @@ fn view(model: &Model) -> El<Msg> {
     div![
         card("Campaigns", &channels.len().to_string()),
         card("Ad units", &unique_units.len().to_string()),
-        card("Total campaign deposits", &dai_readable(&total_deposit)),
-        card("Paid out", &dai_readable(&total_paid)),
+        card("Publishers", &unique_publishers.len().to_string()),
         // @TODO warn that this is an estimation; add a question mark next to it
         // to explain what an estimation means
         card(
             "Impressions",
             &total_impressions.to_formatted_string(&Locale::en)
         ),
-        card("Publishers", &unique_publishers.len().to_string()),
+        br![],
+        card("Total campaign deposits", &dai_readable(&total_deposit)),
+        card("Paid out", &dai_readable(&total_paid)),
         match &model.balance {
             Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
             _ => seed::empty(),
@@ -350,7 +351,7 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
                 )
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
-            let chart: El<Msg> = svg![
+            let chart = svg![
                 attrs!{
                     At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
                     At::Width => format!("{}px", width);
@@ -392,6 +393,7 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
         td!["CPM"],
         td!["Paid"],
         td!["Paid - %"],
+        //td!["Max impressions"],
         td!["Status"],
         td!["Created"],
         //td!["Last updated"],
@@ -429,7 +431,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
             id_prefix
         ]],
         td![format!("${:.2}", &channel.status.usd_estimate)],
-        td![dai_readable(&deposit_amount)],
+        td![dai_readable(deposit_amount)],
         td![dai_readable(
             &(&channel.spec.min_per_impression * &1000.into())
         )],
@@ -440,9 +442,15 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
         }],
+        //td![
+        //    (deposit_amount / &channel.spec.min_per_impression)
+        //        .to_u64()
+        //        .unwrap_or(0)
+        //        .to_formatted_string(&Locale::en)
+        //],
         td![format!("{:?}", &channel.status.status_type)],
         td![time_diff(last_loaded, &channel.spec.created)],
-        //td![time(&channel.status.last_checked)],
+        //td![time_diff(last_loaded, &channel.status.last_checked)],
         td![class!["preview"], {
             match channel.spec.ad_units.get(0) {
                 Some(unit) => a![
