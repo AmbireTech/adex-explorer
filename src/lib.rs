@@ -296,9 +296,7 @@ fn view(model: &Model) -> El<Msg> {
             _ => seed::empty(),
         },
         match &model.volume {
-            Loadable::Ready(vol) => card("24h volume", &dai_readable(
-                &vol.aggr.iter().map(|x| &x.value).sum()
-            )),
+            Loadable::Ready(vol) => volume_card(&vol),
             _ => seed::empty(),
         },
         div![
@@ -333,6 +331,59 @@ fn card(label: &str, value: &str) -> El<Msg> {
     ]
 }
 
+fn volume_card(vol: &VolumeResp) -> El<Msg> {
+    let values = vol.aggr.iter().map(|x| &x.value);
+    let card_label = "24h volume";
+    let card_value = dai_readable(&values.clone().sum());
+    let min = values.clone().min();
+    let max = values.clone().max();
+    match (min, max) {
+        (Some(min), Some(max)) => {
+            let range = max - min;
+            let width = 250_u64;
+            let height = 60_u64;
+            let points = values.clone()
+                .map(|v| (&(v - min) * &height.into())
+                     .div_floor(&range)
+                     .to_u64()
+                     .unwrap_or(0)
+                )
+                .collect::<Vec<_>>();
+            let len = points.len() as u64;
+            let chart: El<Msg> = svg![
+                attrs!{
+                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
+                    At::Width => format!("{}px", width);
+                    At::Height => format!("{}px", height);
+                    At::ViewBox => format!("0 0 {} {}", width, height);
+                },
+                polyline![
+                    attrs!{
+                        At::Fill => "none";
+                        At::Custom("stroke".into()) => "#c8dbec";
+                        At::Custom("stroke-width".into()) => "4";
+                        At::Custom("points".into()) => points
+                            .iter()
+                            .enumerate()
+                            .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    }
+                ],
+            ];
+            return div![
+                class!["card chart"],
+                chart,
+                div![class!["card-value"], card_value],
+                div![class!["card-label"], card_label],
+            ];
+        },
+        // no values, so we can't generate points
+        _ => ()
+    }
+    card(card_label, &card_value)
+}
+
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
     let header = tr![
         td!["URL"],
@@ -359,7 +410,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     let paid_total = channel.status.balances_sum();
     let url = format!(
         "{}/channel/{}/status",
-        channel.spec.validators.get(0).map_or("", |v| &v.url),
+        &channel.spec.validators.leader().url,
         channel.id
     );
     let id_prefix = channel.id.chars().take(6).collect::<String>();
