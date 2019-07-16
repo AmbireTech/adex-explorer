@@ -296,9 +296,7 @@ fn view(model: &Model) -> El<Msg> {
             _ => seed::empty(),
         },
         match &model.volume {
-            Loadable::Ready(vol) => card("24h volume", &dai_readable(
-                &vol.aggr.iter().map(|x| &x.value).sum()
-            )),
+            Loadable::Ready(vol) => volume_card(&vol),
             _ => seed::empty(),
         },
         div![
@@ -331,6 +329,26 @@ fn card(label: &str, value: &str) -> El<Msg> {
         div![class!["card-value"], value],
         div![class!["card-label"], label],
     ]
+}
+
+fn volume_card(vol: &VolumeResp) -> El<Msg> {
+    let values = vol.aggr.iter().map(|x| &x.value);
+    let min = values.clone().min();
+    let max = values.clone().max();
+    match (min, max) {
+        (Some(min), Some(max)) => {
+            /*
+            let range = max - min;
+            let base = 1000_u64;
+            let points = values.clone()
+                .map(|v| ((v - min) * &base.into()).div_floor(range))
+                .collect::<Vec<_>>();
+            */
+        },
+        // no values, so we can't generate points
+        _ => ()
+    }
+    card("24h volume", &dai_readable(&values.clone().sum()))
 }
 
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
