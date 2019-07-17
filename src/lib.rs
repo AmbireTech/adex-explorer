@@ -349,6 +349,7 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
                      .to_u64()
                      .unwrap_or(0)
                 )
+                .take(vol.aggr.len() - 1)
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
             let chart = svg![
