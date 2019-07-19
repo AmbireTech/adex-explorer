@@ -332,10 +332,8 @@ fn card(label: &str, value: &str) -> El<Msg> {
     ]
 }
 
-fn volume_card(vol: &VolumeResp) -> El<Msg> {
+fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
-    let card_label = "24h volume";
-    let card_value = dai_readable(&values.clone().sum());
     let min = values.clone().min();
     let max = values.clone().max();
     match (min, max) {
@@ -352,7 +350,7 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
                 .take(vol.aggr.len() - 1)
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
-            let chart = svg![
+            Some(svg![
                 attrs!{
                     At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
                     At::Width => format!("{}px", width);
@@ -372,18 +370,25 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
                             .join(" ")
                     }
                 ],
-            ];
-            return div![
-                class!["card chart"],
-                chart,
-                div![class!["card-value"], card_value],
-                div![class!["card-label"], card_label],
-            ];
+            ])
         },
         // no values, so we can't generate points
-        _ => ()
+        _ => None
     }
-    card(card_label, &card_value)
+}
+
+fn volume_card(vol: &VolumeResp) -> El<Msg> {
+    let card_label = "24h volume";
+    let card_value = dai_readable(&vol.aggr.iter().map(|x| &x.value).sum());
+    match volume_chart(vol) {
+        Some(chart) => div![
+            class!["card chart"],
+            chart,
+            div![class!["card-value"], card_value],
+            div![class!["card-label"], card_label],
+        ],
+        None => card(card_label, &card_value)
+    }
 }
 
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
