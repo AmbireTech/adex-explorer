@@ -292,14 +292,14 @@ fn view(model: &Model) -> El<Msg> {
         .collect::<HashSet<_>>();
 
     div![
-        card("Campaigns", Ready(&channels.len().to_string())),
-        card("Ad units", Ready(&unique_units.len().to_string())),
-        card("Publishers", Ready(&unique_publishers.len().to_string())),
+        card("Campaigns", Ready(channels.len().to_string())),
+        card("Ad units", Ready(unique_units.len().to_string())),
+        card("Publishers", Ready(unique_publishers.len().to_string())),
         // @TODO warn that this is an estimation; add a question mark next to it
         // to explain what an estimation means
         card(
             "Impressions",
-            Ready(&total_impressions.to_formatted_string(&Locale::en))
+            Ready(total_impressions.to_formatted_string(&Locale::en))
         ),
         volume_card(
             "Monthly impressions",
@@ -316,12 +316,12 @@ fn view(model: &Model) -> El<Msg> {
             &model.impressions
         ),
         br![],
-        card("Total campaign deposits", Ready(&dai_readable(&total_deposit))),
-        card("Paid out", Ready(&dai_readable(&total_paid))),
-        match &model.balance {
-            Ready(resp) => card("Locked up on-chain", Ready(&dai_readable(&resp.result))),
-            Loading => card("Locked up on-chain", Loading)
-        },
+        card("Total campaign deposits", Ready(dai_readable(&total_deposit))),
+        card("Paid out", Ready(dai_readable(&total_paid))),
+        card("Locked up on-chain", match &model.balance {
+            Ready(resp) => Ready(dai_readable(&resp.result)),
+            Loading => Loading
+        }),
         volume_card(
             "24h volume",
             match &model.volume {
@@ -354,7 +354,7 @@ fn view(model: &Model) -> El<Msg> {
     ]
 }
 
-fn card(label: &str, value: Loadable<&str>) -> El<Msg> {
+fn card(label: &str, value: Loadable<String>) -> El<Msg> {
     div![
         class!["card"],
         match value {
@@ -422,7 +422,7 @@ fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeRes
             div![class!["card-value"], card_value],
             div![class!["card-label"], card_label],
         ],
-        None => card(card_label, Ready(&card_value)),
+        None => card(card_label, val),
     }
 }
 
