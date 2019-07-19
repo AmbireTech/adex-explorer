@@ -23,7 +23,7 @@ const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
-const REFRESH_MS: i32 = 10000;
+const REFRESH_MS: i32 = 20000;
 
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
