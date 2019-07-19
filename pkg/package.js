@@ -710,8 +710,8 @@ __exports.__wbindgen_throw = function(ptr, len) {
 };
 
 __exports.__wbindgen_closure_wrapper230 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(57);
-    const d = wasm.__wbg_function_table.get(58);
+    const f = wasm.__wbg_function_table.get(58);
+    const d = wasm.__wbg_function_table.get(59);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
