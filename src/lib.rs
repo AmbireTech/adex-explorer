@@ -312,14 +312,14 @@ fn view(model: &Model) -> El<Msg> {
                     .to_formatted_string(&Locale::en),
                 &vol
             ),
-            _ => seed::empty(),
+            _ => card_loading("Monthly impressions"),
         },
         br![],
         card("Total campaign deposits", &dai_readable(&total_deposit)),
         card("Paid out", &dai_readable(&total_paid)),
         match &model.balance {
             Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
-            _ => seed::empty(),
+            _ => card_loading("Locked up on-chain"),
         },
         match &model.volume {
             Loadable::Ready(vol) => volume_card(
@@ -327,7 +327,7 @@ fn view(model: &Model) -> El<Msg> {
                 &dai_readable(&vol.aggr.iter().map(|x| &x.value).sum()),
                 &vol
             ),
-            _ => seed::empty(),
+            _ => card_loading("24h volume"),
         },
         div![
             select![
@@ -357,6 +357,14 @@ fn card(label: &str, value: &str) -> El<Msg> {
     div![
         class!["card"],
         div![class!["card-value"], value],
+        div![class!["card-label"], label],
+    ]
+}
+
+fn card_loading(label: &str) -> El<Msg> {
+    div![
+        class!["card"],
+        div![class!["card-value loading"]],
         div![class!["card-label"], label],
     ]
 }
