@@ -3,7 +3,7 @@ extern crate seed;
 
 use std::collections::HashMap;
 
-use adex_domain::{BigNum, Channel, ChannelSpec, AdUnit};
+use adex_domain::{AdUnit, BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use futures::Future;
@@ -69,7 +69,7 @@ struct MarketChannel {
 // Volume response from the validator
 #[derive(Deserialize, Clone, Debug)]
 struct VolumeResp {
-    pub aggr: Vec<VolDataPoint>
+    pub aggr: Vec<VolDataPoint>,
 }
 #[derive(Deserialize, Clone, Debug)]
 struct VolDataPoint {
@@ -303,8 +303,7 @@ fn view(model: &Model) -> El<Msg> {
         match &model.impressions {
             Loadable::Ready(vol) => volume_card(
                 "Monthly impressions",
-                &vol
-                    .aggr
+                &vol.aggr
                     .iter()
                     .map(|x| &x.value)
                     .sum::<BigNum>()
@@ -371,39 +370,39 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
             let range = max - min;
             let width = 250_u64;
             let height = 60_u64;
-            let points = values.clone()
-                .map(|v| (&(v - min) * &height.into())
-                     .div_floor(&range)
-                     .to_u64()
-                     .unwrap_or(0)
-                )
+            let points = values
+                .clone()
+                .map(|v| {
+                    (&(v - min) * &height.into())
+                        .div_floor(&range)
+                        .to_u64()
+                        .unwrap_or(0)
+                })
                 .take(vol.aggr.len() - 1)
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
             Some(svg![
-                attrs!{
+                attrs! {
                     At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
                     At::Width => format!("{}px", width);
                     At::Height => format!("{}px", height);
                     At::ViewBox => format!("0 0 {} {}", width, height);
                 },
-                polyline![
-                    attrs!{
-                        At::Fill => "none";
-                        At::Custom("stroke".into()) => "#c8dbec";
-                        At::Custom("stroke-width".into()) => "4";
-                        At::Custom("points".into()) => points
-                            .iter()
-                            .enumerate()
-                            .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    }
-                ],
+                polyline![attrs! {
+                    At::Fill => "none";
+                    At::Custom("stroke".into()) => "#c8dbec";
+                    At::Custom("stroke-width".into()) => "4";
+                    At::Custom("points".into()) => points
+                        .iter()
+                        .enumerate()
+                        .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                }],
             ])
-        },
+        }
         // no values, so we can't generate points
-        _ => None
+        _ => None,
     }
 }
 
@@ -415,7 +414,7 @@ fn volume_card(card_label: &str, card_value: &str, vol: &VolumeResp) -> El<Msg> 
             div![class!["card-value"], card_value],
             div![class!["card-label"], card_label],
         ],
-        None => card(card_label, card_value)
+        None => card(card_label, card_value),
     }
 }
 
@@ -501,7 +500,10 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
     for channel in channels.iter() {
         for unit in channel.spec.ad_units.iter() {
-            units_by_type.entry(&unit.ad_type).or_insert(vec![]).push(channel);
+            units_by_type
+                .entry(&unit.ad_type)
+                .or_insert(vec![])
+                .push(channel);
         }
     }
     let units_by_type_stats = units_by_type
@@ -516,29 +518,28 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
         .sorted_by(|x, y| y.1.cmp(&x.1))
         .collect::<Vec<_>>();
 
-    let header = tr![
-        td!["Ad Size"],
-        td!["CPM"],
-        td!["Total volume"],
-    ];
+    let header = tr![td!["Ad Size"], td!["CPM"], td!["Total volume"],];
 
     table![std::iter::once(header)
-        .chain(units_by_type_stats.iter().map(|(ad_type, avg_per_impression, total_vol)| {
-            tr![
-                td![ad_type],
-                td![dai_readable(
-                    &(avg_per_impression * &1000.into())
-                )],
-                td![dai_readable(&total_vol)],
-            ] 
-        }))
+        .chain(
+            units_by_type_stats
+                .iter()
+                .map(|(ad_type, avg_per_impression, total_vol)| {
+                    tr![
+                        td![ad_type],
+                        td![dai_readable(&(avg_per_impression * &1000.into()))],
+                        td![dai_readable(&total_vol)],
+                    ]
+                })
+        )
         .collect::<Vec<El<Msg>>>()]
 }
 
-
 fn unit_preview(unit: &AdUnit) -> El<Msg> {
     if unit.media_mime.starts_with("video/") {
-        video![attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true }]
+        video![
+            attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true }
+        ]
     } else {
         img![attrs! { At::Src => to_http_url(&unit.media_url) }]
     }
