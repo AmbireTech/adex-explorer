@@ -297,7 +297,11 @@ fn view(model: &Model) -> El<Msg> {
             _ => seed::empty(),
         },
         match &model.volume {
-            Loadable::Ready(vol) => volume_card(&vol),
+            Loadable::Ready(vol) => volume_card(
+                "24h volume",
+                &dai_readable(&vol.aggr.iter().map(|x| &x.value).sum()),
+                &vol
+            ),
             _ => seed::empty(),
         },
         div![
@@ -377,9 +381,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     }
 }
 
-fn volume_card(vol: &VolumeResp) -> El<Msg> {
-    let card_label = "24h volume";
-    let card_value = dai_readable(&vol.aggr.iter().map(|x| &x.value).sum());
+fn volume_card(card_label: &str, card_value: &str, vol: &VolumeResp) -> El<Msg> {
     match volume_chart(vol) {
         Some(chart) => div![
             class!["card chart"],
@@ -387,7 +389,7 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
             div![class!["card-value"], card_value],
             div![class!["card-label"], card_label],
         ],
-        None => card(card_label, &card_value)
+        None => card(card_label, card_value)
     }
 }
 
