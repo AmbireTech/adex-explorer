@@ -16,6 +16,7 @@ use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const VOLUME_URL: &str = "https://tom.adex.network/volume";
+const IMPRESSIONS_URL: &str = "https://tom.adex.network/volume/monthly-impressions";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
@@ -124,6 +125,7 @@ struct Model {
     pub market_channels: Loadable<Vec<MarketChannel>>,
     pub balance: Loadable<EtherscanBalResp>,
     pub volume: Loadable<VolumeResp>,
+    pub impressions: Loadable<VolumeResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -181,6 +183,13 @@ impl ActionLoad {
                         .map(Msg::VolumeLoaded)
                         .map_err(Msg::OnFetchErr),
                 );
+                orders.perform_cmd(
+                    Request::new(&IMPRESSIONS_URL)
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::ImpressionsLoaded)
+                        .map_err(Msg::OnFetchErr),
+                );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
@@ -205,6 +214,7 @@ enum Msg {
     BalanceLoaded(EtherscanBalResp),
     ChannelsLoaded(Vec<MarketChannel>),
     VolumeLoaded(VolumeResp),
+    ImpressionsLoaded(VolumeResp),
     OnFetchErr(JsValue),
     SortSelected(String),
 }
@@ -229,6 +239,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
         Msg::VolumeLoaded(vol) => model.volume = Loadable::Ready(vol),
+        Msg::ImpressionsLoaded(vol) => model.impressions = Loadable::Ready(vol),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
@@ -289,6 +300,21 @@ fn view(model: &Model) -> El<Msg> {
             "Impressions",
             &total_impressions.to_formatted_string(&Locale::en)
         ),
+        match &model.impressions {
+            Loadable::Ready(vol) => volume_card(
+                "Monthly impressions",
+                &vol
+                    .aggr
+                    .iter()
+                    .map(|x| &x.value)
+                    .sum::<BigNum>()
+                    .to_u64()
+                    .unwrap_or(0)
+                    .to_formatted_string(&Locale::en),
+                &vol
+            ),
+            _ => seed::empty(),
+        },
         br![],
         card("Total campaign deposits", &dai_readable(&total_deposit)),
         card("Paid out", &dai_readable(&total_paid)),
