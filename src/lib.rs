@@ -3,7 +3,7 @@ extern crate seed;
 
 use std::collections::HashMap;
 
-use adex_domain::{BigNum, Channel, ChannelSpec, AdUnit};
+use adex_domain::{AdUnit, BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use futures::Future;
@@ -16,13 +16,14 @@ use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const VOLUME_URL: &str = "https://tom.adex.network/volume";
+const IMPRESSIONS_URL: &str = "https://tom.adex.network/volume/monthly-impressions";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
-const REFRESH_MS: i32 = 10000;
+const REFRESH_MS: i32 = 20000;
 
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -68,7 +69,7 @@ struct MarketChannel {
 // Volume response from the validator
 #[derive(Deserialize, Clone, Debug)]
 struct VolumeResp {
-    pub aggr: Vec<VolDataPoint>
+    pub aggr: Vec<VolDataPoint>,
 }
 #[derive(Deserialize, Clone, Debug)]
 struct VolDataPoint {
@@ -92,6 +93,7 @@ impl<T> Default for Loadable<T> {
         Loadable::Loading
     }
 }
+use Loadable::*;
 
 #[derive(Clone, Copy)]
 enum ChannelSort {
@@ -124,6 +126,7 @@ struct Model {
     pub market_channels: Loadable<Vec<MarketChannel>>,
     pub balance: Loadable<EtherscanBalResp>,
     pub volume: Loadable<VolumeResp>,
+    pub impressions: Loadable<VolumeResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -181,6 +184,13 @@ impl ActionLoad {
                         .map(Msg::VolumeLoaded)
                         .map_err(Msg::OnFetchErr),
                 );
+                orders.perform_cmd(
+                    Request::new(&IMPRESSIONS_URL)
+                        .method(Method::Get)
+                        .fetch_json()
+                        .map(Msg::ImpressionsLoaded)
+                        .map_err(Msg::OnFetchErr),
+                );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
@@ -205,6 +215,7 @@ enum Msg {
     BalanceLoaded(EtherscanBalResp),
     ChannelsLoaded(Vec<MarketChannel>),
     VolumeLoaded(VolumeResp),
+    ImpressionsLoaded(VolumeResp),
     OnFetchErr(JsValue),
     SortSelected(String),
 }
@@ -223,12 +234,13 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip();
             model.load_action.perform_effects(orders);
         }
-        Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
+        Msg::BalanceLoaded(resp) => model.balance = Ready(resp),
         Msg::ChannelsLoaded(channels) => {
-            model.market_channels = Loadable::Ready(channels);
+            model.market_channels = Ready(channels);
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
-        Msg::VolumeLoaded(vol) => model.volume = Loadable::Ready(vol),
+        Msg::VolumeLoaded(vol) => model.volume = Ready(vol),
+        Msg::ImpressionsLoaded(vol) => model.impressions = Ready(vol),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
@@ -239,8 +251,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 // View
 fn view(model: &Model) -> El<Msg> {
     let channels = match &model.market_channels {
-        Loadable::Loading => return h2!["Loading..."],
-        Loadable::Ready(c) => c,
+        Loading => return h2!["Loading..."],
+        Ready(c) => c,
     };
 
     let total_impressions: u64 = channels
@@ -280,26 +292,44 @@ fn view(model: &Model) -> El<Msg> {
         .collect::<HashSet<_>>();
 
     div![
-        card("Campaigns", &channels.len().to_string()),
-        card("Ad units", &unique_units.len().to_string()),
-        card("Publishers", &unique_publishers.len().to_string()),
+        card("Campaigns", Ready(channels.len().to_string())),
+        card("Ad units", Ready(unique_units.len().to_string())),
+        card("Publishers", Ready(unique_publishers.len().to_string())),
         // @TODO warn that this is an estimation; add a question mark next to it
         // to explain what an estimation means
         card(
             "Impressions",
-            &total_impressions.to_formatted_string(&Locale::en)
+            Ready(total_impressions.to_formatted_string(&Locale::en))
+        ),
+        volume_card(
+            "Monthly impressions",
+            match &model.impressions {
+                Ready(vol) => Ready(vol.aggr
+                    .iter()
+                    .map(|x| &x.value)
+                    .sum::<BigNum>()
+                    .to_u64()
+                    .unwrap_or(0)
+                    .to_formatted_string(&Locale::en)),
+                Loading => Loading
+            },
+            &model.impressions
         ),
         br![],
-        card("Total campaign deposits", &dai_readable(&total_deposit)),
-        card("Paid out", &dai_readable(&total_paid)),
-        match &model.balance {
-            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
-            _ => seed::empty(),
-        },
-        match &model.volume {
-            Loadable::Ready(vol) => volume_card(&vol),
-            _ => seed::empty(),
-        },
+        card("Total campaign deposits", Ready(dai_readable(&total_deposit))),
+        card("Paid out", Ready(dai_readable(&total_paid))),
+        card("Locked up on-chain", match &model.balance {
+            Ready(resp) => Ready(dai_readable(&resp.result)),
+            Loading => Loading
+        }),
+        volume_card(
+            "24h volume",
+            match &model.volume {
+                Ready(vol) => Ready(dai_readable(&vol.aggr.iter().map(|x| &x.value).sum())),
+                Loading => Loading
+            },
+            &model.volume
+        ),
         div![
             select![
                 attrs! {At::Value => "deposit"},
@@ -324,18 +354,19 @@ fn view(model: &Model) -> El<Msg> {
     ]
 }
 
-fn card(label: &str, value: &str) -> El<Msg> {
+fn card(label: &str, value: Loadable<String>) -> El<Msg> {
     div![
         class!["card"],
-        div![class!["card-value"], value],
+        match value {
+            Loading => div![class!["card-value loading"]],
+            Ready(value) => div![class!["card-value"], value],
+        },
         div![class!["card-label"], label],
     ]
 }
 
-fn volume_card(vol: &VolumeResp) -> El<Msg> {
+fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
-    let card_label = "24h volume";
-    let card_value = dai_readable(&values.clone().sum());
     let min = values.clone().min();
     let max = values.clone().max();
     match (min, max) {
@@ -343,47 +374,56 @@ fn volume_card(vol: &VolumeResp) -> El<Msg> {
             let range = max - min;
             let width = 250_u64;
             let height = 60_u64;
-            let points = values.clone()
-                .map(|v| (&(v - min) * &height.into())
-                     .div_floor(&range)
-                     .to_u64()
-                     .unwrap_or(0)
-                )
+            let points = values
+                .clone()
+                .map(|v| {
+                    (&(v - min) * &height.into())
+                        .div_floor(&range)
+                        .to_u64()
+                        .unwrap_or(0)
+                })
                 .take(vol.aggr.len() - 1)
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
-            let chart = svg![
-                attrs!{
+            Some(svg![
+                attrs! {
                     At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
                     At::Width => format!("{}px", width);
                     At::Height => format!("{}px", height);
                     At::ViewBox => format!("0 0 {} {}", width, height);
                 },
-                polyline![
-                    attrs!{
-                        At::Fill => "none";
-                        At::Custom("stroke".into()) => "#c8dbec";
-                        At::Custom("stroke-width".into()) => "4";
-                        At::Custom("points".into()) => points
-                            .iter()
-                            .enumerate()
-                            .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    }
-                ],
-            ];
-            return div![
-                class!["card chart"],
-                chart,
-                div![class!["card-value"], card_value],
-                div![class!["card-label"], card_label],
-            ];
-        },
+                polyline![attrs! {
+                    At::Fill => "none";
+                    At::Custom("stroke".into()) => "#c8dbec";
+                    At::Custom("stroke-width".into()) => "4";
+                    At::Custom("points".into()) => points
+                        .iter()
+                        .enumerate()
+                        .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                }],
+            ])
+        }
         // no values, so we can't generate points
-        _ => ()
+        _ => None,
     }
-    card(card_label, &card_value)
+}
+
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
+    let (card_value, vol) = match (&val, vol) {
+        (Ready(val), Ready(vol)) => (val, vol),
+        _ => return card(card_label, Loading)
+    };
+    match volume_chart(vol) {
+        Some(chart) => div![
+            class!["card chart"],
+            chart,
+            div![class!["card-value"], card_value],
+            div![class!["card-label"], card_label],
+        ],
+        None => card(card_label, val),
+    }
 }
 
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
@@ -468,7 +508,10 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
     for channel in channels.iter() {
         for unit in channel.spec.ad_units.iter() {
-            units_by_type.entry(&unit.ad_type).or_insert(vec![]).push(channel);
+            units_by_type
+                .entry(&unit.ad_type)
+                .or_insert(vec![])
+                .push(channel);
         }
     }
     let units_by_type_stats = units_by_type
@@ -483,29 +526,28 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
         .sorted_by(|x, y| y.1.cmp(&x.1))
         .collect::<Vec<_>>();
 
-    let header = tr![
-        td!["Ad Size"],
-        td!["CPM"],
-        td!["Total volume"],
-    ];
+    let header = tr![td!["Ad Size"], td!["CPM"], td!["Total volume"],];
 
     table![std::iter::once(header)
-        .chain(units_by_type_stats.iter().map(|(ad_type, avg_per_impression, total_vol)| {
-            tr![
-                td![ad_type],
-                td![dai_readable(
-                    &(avg_per_impression * &1000.into())
-                )],
-                td![dai_readable(&total_vol)],
-            ] 
-        }))
+        .chain(
+            units_by_type_stats
+                .iter()
+                .map(|(ad_type, avg_per_impression, total_vol)| {
+                    tr![
+                        td![ad_type],
+                        td![dai_readable(&(avg_per_impression * &1000.into()))],
+                        td![dai_readable(&total_vol)],
+                    ]
+                })
+        )
         .collect::<Vec<El<Msg>>>()]
 }
 
-
 fn unit_preview(unit: &AdUnit) -> El<Msg> {
     if unit.media_mime.starts_with("video/") {
-        video![attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true }]
+        video![
+            attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true }
+        ]
     } else {
         img![attrs! { At::Src => to_http_url(&unit.media_url) }]
     }
