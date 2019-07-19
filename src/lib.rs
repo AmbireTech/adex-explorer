@@ -385,6 +385,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
                 .take(vol.aggr.len() - 1)
                 .collect::<Vec<_>>();
             let len = points.len() as u64;
+            let ratio = width as f64 / (len - 1) as f64;
             Some(svg![
                 attrs! {
                     At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
@@ -399,7 +400,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
                     At::Custom("points".into()) => points
                         .iter()
                         .enumerate()
-                        .map(|(i, p)| format!("{},{}", i as u64 * width / len as u64, height-p))
+                        .map(|(i, p)| format!("{},{}", (i as f64 * ratio).ceil(), height-p))
                         .collect::<Vec<_>>()
                         .join(" ")
                 }],
