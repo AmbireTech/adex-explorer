@@ -93,6 +93,7 @@ impl<T> Default for Loadable<T> {
         Loadable::Loading
     }
 }
+use Loadable::*;
 
 #[derive(Clone, Copy)]
 enum ChannelSort {
@@ -233,13 +234,13 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip();
             model.load_action.perform_effects(orders);
         }
-        Msg::BalanceLoaded(resp) => model.balance = Loadable::Ready(resp),
+        Msg::BalanceLoaded(resp) => model.balance = Ready(resp),
         Msg::ChannelsLoaded(channels) => {
-            model.market_channels = Loadable::Ready(channels);
+            model.market_channels = Ready(channels);
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
-        Msg::VolumeLoaded(vol) => model.volume = Loadable::Ready(vol),
-        Msg::ImpressionsLoaded(vol) => model.impressions = Loadable::Ready(vol),
+        Msg::VolumeLoaded(vol) => model.volume = Ready(vol),
+        Msg::ImpressionsLoaded(vol) => model.impressions = Ready(vol),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
@@ -250,8 +251,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 // View
 fn view(model: &Model) -> El<Msg> {
     let channels = match &model.market_channels {
-        Loadable::Loading => return h2!["Loading..."],
-        Loadable::Ready(c) => c,
+        Loading => return h2!["Loading..."],
+        Ready(c) => c,
     };
 
     let total_impressions: u64 = channels
@@ -291,44 +292,44 @@ fn view(model: &Model) -> El<Msg> {
         .collect::<HashSet<_>>();
 
     div![
-        card("Campaigns", &channels.len().to_string()),
-        card("Ad units", &unique_units.len().to_string()),
-        card("Publishers", &unique_publishers.len().to_string()),
+        card("Campaigns", Ready(&channels.len().to_string())),
+        card("Ad units", Ready(&unique_units.len().to_string())),
+        card("Publishers", Ready(&unique_publishers.len().to_string())),
         // @TODO warn that this is an estimation; add a question mark next to it
         // to explain what an estimation means
         card(
             "Impressions",
-            &total_impressions.to_formatted_string(&Locale::en)
+            Ready(&total_impressions.to_formatted_string(&Locale::en))
         ),
-        match &model.impressions {
-            Loadable::Ready(vol) => volume_card(
-                "Monthly impressions",
-                &vol.aggr
+        volume_card(
+            "Monthly impressions",
+            match &model.impressions {
+                Ready(vol) => Ready(vol.aggr
                     .iter()
                     .map(|x| &x.value)
                     .sum::<BigNum>()
                     .to_u64()
                     .unwrap_or(0)
-                    .to_formatted_string(&Locale::en),
-                &vol
-            ),
-            _ => card_loading("Monthly impressions"),
-        },
+                    .to_formatted_string(&Locale::en)),
+                Loading => Loading
+            },
+            &model.impressions
+        ),
         br![],
-        card("Total campaign deposits", &dai_readable(&total_deposit)),
-        card("Paid out", &dai_readable(&total_paid)),
+        card("Total campaign deposits", Ready(&dai_readable(&total_deposit))),
+        card("Paid out", Ready(&dai_readable(&total_paid))),
         match &model.balance {
-            Loadable::Ready(resp) => card("Locked up on-chain", &dai_readable(&resp.result)),
-            _ => card_loading("Locked up on-chain"),
+            Ready(resp) => card("Locked up on-chain", Ready(&dai_readable(&resp.result))),
+            Loading => card("Locked up on-chain", Loading)
         },
-        match &model.volume {
-            Loadable::Ready(vol) => volume_card(
-                "24h volume",
-                &dai_readable(&vol.aggr.iter().map(|x| &x.value).sum()),
-                &vol
-            ),
-            _ => card_loading("24h volume"),
-        },
+        volume_card(
+            "24h volume",
+            match &model.volume {
+                Ready(vol) => Ready(dai_readable(&vol.aggr.iter().map(|x| &x.value).sum())),
+                Loading => Loading
+            },
+            &model.volume
+        ),
         div![
             select![
                 attrs! {At::Value => "deposit"},
@@ -353,18 +354,13 @@ fn view(model: &Model) -> El<Msg> {
     ]
 }
 
-fn card(label: &str, value: &str) -> El<Msg> {
+fn card(label: &str, value: Loadable<&str>) -> El<Msg> {
     div![
         class!["card"],
-        div![class!["card-value"], value],
-        div![class!["card-label"], label],
-    ]
-}
-
-fn card_loading(label: &str) -> El<Msg> {
-    div![
-        class!["card"],
-        div![class!["card-value loading"]],
+        match value {
+            Loading => div![class!["card-value loading"]],
+            Ready(value) => div![class!["card-value"], value],
+        },
         div![class!["card-label"], label],
     ]
 }
@@ -414,7 +410,11 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     }
 }
 
-fn volume_card(card_label: &str, card_value: &str, vol: &VolumeResp) -> El<Msg> {
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
+    let (card_value, vol) = match (&val, vol) {
+        (Ready(val), Ready(vol)) => (val, vol),
+        _ => return card(card_label, Loading)
+    };
     match volume_chart(vol) {
         Some(chart) => div![
             class!["card chart"],
@@ -422,7 +422,7 @@ fn volume_card(card_label: &str, card_value: &str, vol: &VolumeResp) -> El<Msg> 
             div![class!["card-value"], card_value],
             div![class!["card-label"], card_label],
         ],
-        None => card(card_label, card_value),
+        None => card(card_label, Ready(&card_value)),
     }
 }
 
