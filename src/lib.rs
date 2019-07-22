@@ -367,48 +367,42 @@ fn card(label: &str, value: Loadable<String>) -> El<Msg> {
 
 fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
-    let min = values.clone().min();
-    let max = values.clone().max();
-    match (min, max) {
-        (Some(min), Some(max)) => {
-            let range = max - min;
-            let width = 250_u64;
-            let height = 60_u64;
-            let points = values
-                .clone()
-                .map(|v| {
-                    (&(v - min) * &height.into())
-                        .div_floor(&range)
-                        .to_u64()
-                        .unwrap_or(0)
-                })
-                .take(vol.aggr.len() - 1)
-                .collect::<Vec<_>>();
-            let len = points.len() as u64;
-            let ratio = width as f64 / (len - 1) as f64;
-            Some(svg![
-                attrs! {
-                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
-                    At::Width => format!("{}px", width);
-                    At::Height => format!("{}px", height);
-                    At::ViewBox => format!("0 0 {} {}", width, height);
-                },
-                polyline![attrs! {
-                    At::Fill => "none";
-                    At::Custom("stroke".into()) => "#c8dbec";
-                    At::Custom("stroke-width".into()) => "4";
-                    At::Custom("points".into()) => points
-                        .iter()
-                        .enumerate()
-                        .map(|(i, p)| format!("{},{}", (i as f64 * ratio).ceil(), height-p))
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                }],
-            ])
-        }
-        // no values, so we can't generate points
-        _ => None,
-    }
+    let min = values.clone().min()?;
+    let max = values.clone().max()?;
+    let range = max - min;
+    let width = 250_u64;
+    let height = 60_u64;
+    let points = values
+        .clone()
+        .map(|v| {
+            (&(v - min) * &height.into())
+                .div_floor(&range)
+                .to_u64()
+                .unwrap_or(0)
+        })
+        .take(vol.aggr.len() - 1)
+        .collect::<Vec<_>>();
+    let len = points.len() as u64;
+    let ratio = width as f64 / (len - 1) as f64;
+    Some(svg![
+        attrs! {
+            At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
+            At::Width => format!("{}px", width);
+            At::Height => format!("{}px", height);
+            At::ViewBox => format!("0 0 {} {}", width, height);
+        },
+        polyline![attrs! {
+            At::Fill => "none";
+            At::Custom("stroke".into()) => "#c8dbec";
+            At::Custom("stroke-width".into()) => "4";
+            At::Custom("points".into()) => points
+                .iter()
+                .enumerate()
+                .map(|(i, p)| format!("{},{}", (i as f64 * ratio).ceil(), height-p))
+                .collect::<Vec<_>>()
+                .join(" ")
+        }],
+    ])
 }
 
 fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
