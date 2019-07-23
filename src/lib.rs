@@ -130,15 +130,16 @@ struct Model {
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
-    pub show_channels: bool,
 }
 
 // Update
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 enum ActionLoad {
     // The summary includes latest campaigns on the market,
     // and some on-chain data (e.g. DAI balance on core SC)
     Summary,
+    // Channels will show the summary plus the channels
+    Channels,
     // The channel detail contains a summary of what validator knows about a channel
     ChannelDetail(String),
 }
@@ -150,7 +151,7 @@ impl Default for ActionLoad {
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut Orders<Msg>) {
         match self {
-            ActionLoad::Summary => {
+            ActionLoad::Summary | ActionLoad::Channels => {
                 // Load on-chain balances
                 let etherscan_uri = format!(
                     "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
@@ -333,7 +334,7 @@ fn view(model: &Model) -> El<Msg> {
             &model.volume
         ),
         // Tables
-        if model.show_channels {
+        if model.load_action == ActionLoad::Channels {
             div![
                 select![
                     attrs! {At::Value => "deposit"},
@@ -585,6 +586,7 @@ fn dai_readable(bal: &BigNum) -> String {
 // Router
 fn routes(url: &seed::Url) -> Msg {
     match url.path.get(0).map(|x| x.as_ref()) {
+        Some("channels") => Msg::Load(ActionLoad::Channels),
         Some("channel") => match url.path.get(1) {
             Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
             None => Msg::Load(ActionLoad::Summary),
@@ -600,6 +602,5 @@ pub fn render() {
         .finish()
         .run();
 
-    state.update(Msg::Load(ActionLoad::Summary));
     seed::set_interval(Box::new(move || state.update(Msg::Refresh)), REFRESH_MS);
 }
