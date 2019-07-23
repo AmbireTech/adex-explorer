@@ -23,7 +23,7 @@ const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
-const REFRESH_MS: i32 = 20000;
+const REFRESH_MS: i32 = 30000;
 
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -133,11 +133,13 @@ struct Model {
 }
 
 // Update
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 enum ActionLoad {
     // The summary includes latest campaigns on the market,
     // and some on-chain data (e.g. DAI balance on core SC)
     Summary,
+    // Channels will show the summary plus the channels
+    Channels,
     // The channel detail contains a summary of what validator knows about a channel
     ChannelDetail(String),
 }
@@ -149,7 +151,7 @@ impl Default for ActionLoad {
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut Orders<Msg>) {
         match self {
-            ActionLoad::Summary => {
+            ActionLoad::Summary | ActionLoad::Channels => {
                 // Load on-chain balances
                 let etherscan_uri = format!(
                     "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
@@ -292,6 +294,7 @@ fn view(model: &Model) -> El<Msg> {
         .collect::<HashSet<_>>();
 
     div![
+        // Cards
         card("Campaigns", Ready(channels.len().to_string())),
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
@@ -330,27 +333,32 @@ fn view(model: &Model) -> El<Msg> {
             },
             &model.volume
         ),
-        div![
-            select![
-                attrs! {At::Value => "deposit"},
-                option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
-                option![attrs! {At::Value => "status"}, "Sort by status"],
-                option![attrs! {At::Value => "created"}, "Sort by created"],
-                input_ev(Ev::Input, Msg::SortSelected)
-            ],
-            channel_table(
-                model.last_loaded,
-                &channels_dai
-                    .clone()
-                    .sorted_by(|x, y| match model.sort {
-                        ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
-                        ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
-                        ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
-                    })
-                    .collect::<Vec<_>>()
-            ),
-            ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
-        ]
+        // Tables
+        if model.load_action == ActionLoad::Channels {
+            div![
+                select![
+                    attrs! {At::Value => "deposit"},
+                    option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
+                    option![attrs! {At::Value => "status"}, "Sort by status"],
+                    option![attrs! {At::Value => "created"}, "Sort by created"],
+                    input_ev(Ev::Input, Msg::SortSelected)
+                ],
+                channel_table(
+                    model.last_loaded,
+                    &channels_dai
+                        .clone()
+                        .sorted_by(|x, y| match model.sort {
+                            ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                            ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                            ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                        })
+                        .collect::<Vec<_>>()
+                ),
+            ]
+        } else {
+            seed::empty()
+        },
+        ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
     ]
 }
 
@@ -367,48 +375,42 @@ fn card(label: &str, value: Loadable<String>) -> El<Msg> {
 
 fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
-    let min = values.clone().min();
-    let max = values.clone().max();
-    match (min, max) {
-        (Some(min), Some(max)) => {
-            let range = max - min;
-            let width = 250_u64;
-            let height = 60_u64;
-            let points = values
-                .clone()
-                .map(|v| {
-                    (&(v - min) * &height.into())
-                        .div_floor(&range)
-                        .to_u64()
-                        .unwrap_or(0)
-                })
-                .take(vol.aggr.len() - 1)
-                .collect::<Vec<_>>();
-            let len = points.len() as u64;
-            let ratio = width as f64 / (len - 1) as f64;
-            Some(svg![
-                attrs! {
-                    At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
-                    At::Width => format!("{}px", width);
-                    At::Height => format!("{}px", height);
-                    At::ViewBox => format!("0 0 {} {}", width, height);
-                },
-                polyline![attrs! {
-                    At::Fill => "none";
-                    At::Custom("stroke".into()) => "#c8dbec";
-                    At::Custom("stroke-width".into()) => "4";
-                    At::Custom("points".into()) => points
-                        .iter()
-                        .enumerate()
-                        .map(|(i, p)| format!("{},{}", (i as f64 * ratio).ceil(), height-p))
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                }],
-            ])
-        }
-        // no values, so we can't generate points
-        _ => None,
-    }
+    let min = values.clone().min()?;
+    let max = values.clone().max()?;
+    let range = max - min;
+    let width = 250_u64;
+    let height = 60_u64;
+    let points = values
+        .clone()
+        .map(|v| {
+            (&(v - min) * &height.into())
+                .div_floor(&range)
+                .to_u64()
+                .unwrap_or(0)
+        })
+        .take(vol.aggr.len() - 1)
+        .collect::<Vec<_>>();
+    let len = points.len() as u64;
+    let ratio = width as f64 / (len - 1) as f64;
+    Some(svg![
+        attrs! {
+            At::Style => "position: absolute; right: 0px; left: 0px; bottom: 10px;";
+            At::Width => format!("{}px", width);
+            At::Height => format!("{}px", height);
+            At::ViewBox => format!("0 0 {} {}", width, height);
+        },
+        polyline![attrs! {
+            At::Fill => "none";
+            At::Custom("stroke".into()) => "#c8dbec";
+            At::Custom("stroke-width".into()) => "4";
+            At::Custom("points".into()) => points
+                .iter()
+                .enumerate()
+                .map(|(i, p)| format!("{},{}", (i as f64 * ratio).ceil(), height-p))
+                .collect::<Vec<_>>()
+                .join(" ")
+        }],
+    ])
 }
 
 fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
@@ -547,7 +549,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
 fn unit_preview(unit: &AdUnit) -> El<Msg> {
     if unit.media_mime.starts_with("video/") {
         video![
-            attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true }
+            attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true; At::Muted => true }
         ]
     } else {
         img![attrs! { At::Src => to_http_url(&unit.media_url) }]
@@ -584,6 +586,7 @@ fn dai_readable(bal: &BigNum) -> String {
 // Router
 fn routes(url: &seed::Url) -> Msg {
     match url.path.get(0).map(|x| x.as_ref()) {
+        Some("channels") => Msg::Load(ActionLoad::Channels),
         Some("channel") => match url.path.get(1) {
             Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
             None => Msg::Load(ActionLoad::Summary),
@@ -599,6 +602,5 @@ pub fn render() {
         .finish()
         .run();
 
-    state.update(Msg::Load(ActionLoad::Summary));
     seed::set_interval(Box::new(move || state.update(Msg::Refresh)), REFRESH_MS);
 }
