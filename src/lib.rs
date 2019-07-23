@@ -130,6 +130,7 @@ struct Model {
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
+    pub show_channels: bool,
 }
 
 // Update
@@ -292,6 +293,7 @@ fn view(model: &Model) -> El<Msg> {
         .collect::<HashSet<_>>();
 
     div![
+        // Cards
         card("Campaigns", Ready(channels.len().to_string())),
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
@@ -330,27 +332,32 @@ fn view(model: &Model) -> El<Msg> {
             },
             &model.volume
         ),
-        div![
-            select![
-                attrs! {At::Value => "deposit"},
-                option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
-                option![attrs! {At::Value => "status"}, "Sort by status"],
-                option![attrs! {At::Value => "created"}, "Sort by created"],
-                input_ev(Ev::Input, Msg::SortSelected)
-            ],
-            channel_table(
-                model.last_loaded,
-                &channels_dai
-                    .clone()
-                    .sorted_by(|x, y| match model.sort {
-                        ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
-                        ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
-                        ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
-                    })
-                    .collect::<Vec<_>>()
-            ),
-            ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
-        ]
+        // Tables
+        if model.show_channels {
+            div![
+                select![
+                    attrs! {At::Value => "deposit"},
+                    option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
+                    option![attrs! {At::Value => "status"}, "Sort by status"],
+                    option![attrs! {At::Value => "created"}, "Sort by created"],
+                    input_ev(Ev::Input, Msg::SortSelected)
+                ],
+                channel_table(
+                    model.last_loaded,
+                    &channels_dai
+                        .clone()
+                        .sorted_by(|x, y| match model.sort {
+                            ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                            ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                            ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                        })
+                        .collect::<Vec<_>>()
+                ),
+            ]
+        } else {
+            seed::empty()
+        },
+        ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
     ]
 }
 
