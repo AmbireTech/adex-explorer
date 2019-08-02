@@ -65,6 +65,14 @@ struct MarketChannel {
     pub status: MarketStatus,
     pub spec: ChannelSpec,
 }
+impl MarketChannel {
+    fn balances_no_creator_sum(&self) -> BigNum {
+        self.status.balances.iter()
+            .filter(|(k, _)| *k != &self.creator)
+            .map(|(_, v)| v)
+            .sum()
+    }
+}
 
 // Volume response from the validator
 #[derive(Deserialize, Clone, Debug)]
@@ -260,7 +268,7 @@ fn view(model: &Model) -> El<Msg> {
     let total_impressions: u64 = channels
         .iter()
         .map(|x| {
-            (&x.status.balances_sum() / &x.spec.min_per_impression)
+            (&x.balances_no_creator_sum() / &x.spec.min_per_impression)
                 .to_u64()
                 .unwrap_or(0)
         })
@@ -270,7 +278,7 @@ fn view(model: &Model) -> El<Msg> {
         .iter()
         .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
 
-    let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
+    let total_paid = channels_dai.clone().map(|x| x.balances_no_creator_sum()).sum();
     let total_deposit = channels_dai
         .clone()
         .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
