@@ -634,10 +634,19 @@ fn routes(url: seed::Url) -> Msg {
         _ => Msg::Load(ActionLoad::Summary),
     }
 }
+// ------ ------
+//     Init : to force the initial route according to the URL (necessary since seed 0.4.0 - PR #189 'scalable application support'')
+//             https://github.com/David-OConnor/seed/pull/189#issuecomment-517747635
+// ------ ------
+
+fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
+    orders.send_msg(routes(url));
+    Model::default()
+}
 
 #[wasm_bindgen]
 pub fn render() {
-    let state = seed::App::build(|_, _| Model::default(), update, view)
+    let state = seed::App::build(init, update, view)
         .routes(routes)
         .finish()
         .run();
