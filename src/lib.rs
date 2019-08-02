@@ -219,7 +219,7 @@ enum Msg {
     VolumeLoaded(VolumeResp),
     ImpressionsLoaded(VolumeResp),
     OnFetchErr(JsValue),
-    SortSelected(String),
+    ChannelMsg(ChannelMsg),
 }
 
 fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
@@ -243,7 +243,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
         }
         Msg::VolumeLoaded(vol) => model.volume = Ready(vol),
         Msg::ImpressionsLoaded(vol) => model.impressions = Ready(vol),
-        Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
+        Msg::ChannelMsg(ChannelMsg::SortSelected(sort_name)) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
         Msg::OnFetchErr(_) => (),
@@ -320,26 +320,10 @@ fn view(model: &Model) -> El<Msg> {
         ),
         // Tables
         if model.load_action == ActionLoad::Channels {
-            div![
-                select![
-                    attrs! {At::Value => "deposit"},
-                    option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
-                    option![attrs! {At::Value => "status"}, "Sort by status"],
-                    option![attrs! {At::Value => "created"}, "Sort by created"],
-                    input_ev(Ev::Input, Msg::SortSelected)
-                ],
-                channel_table(
-                    model.last_loaded,
-                    &channels_dai
-                        .clone()
-                        .sorted_by(|x, y| match model.sort {
-                            ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
-                            ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
-                            ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
-                        })
-                        .collect::<Vec<_>>()
-                ),
-            ]
+            // @TODO cloning the iterator to make into a vec is stupid here, cause we do the same
+            // in the component
+            channels_component(model.last_loaded, &model.sort, &channels_dai.clone().collect::<Vec<_>>())
+                .map_message(Msg::ChannelMsg)
         } else {
             seed::empty()
         },
@@ -414,7 +398,36 @@ fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeRes
     }
 }
 
-fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
+// Component
+#[derive(Clone)]
+enum ChannelMsg {
+    SortSelected(String)
+}
+fn channels_component(last_loaded: i64, sort: &ChannelSort, channels: &[&MarketChannel]) -> El<ChannelMsg> {
+    div![
+        select![
+            attrs! {At::Value => "deposit"},
+            option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
+            option![attrs! {At::Value => "status"}, "Sort by status"],
+            option![attrs! {At::Value => "created"}, "Sort by created"],
+            input_ev(Ev::Input, ChannelMsg::SortSelected)
+        ],
+        channel_table(
+            last_loaded,
+            &channels
+                .iter()
+                .map(|x| *x)
+                .sorted_by(|x, y| match sort {
+                    ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                    ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                    ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                })
+                .collect::<Vec<_>>()
+        ),
+    ]
+}
+
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<ChannelMsg> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -431,12 +444,12 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
 
     let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
-        .collect::<Vec<El<Msg>>>();
+        .collect::<Vec<_>>();
 
     table![channels]
 }
 
-fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
+fn channel(last_loaded: i64, channel: &MarketChannel) -> El<ChannelMsg> {
     let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
@@ -491,6 +504,17 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
         }]
     ]
 }
+fn unit_preview(unit: &AdUnit) -> El<ChannelMsg> {
+    if unit.media_mime.starts_with("video/") {
+        video![
+            attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true; At::Muted => true }
+        ]
+    } else {
+        img![attrs! { At::Src => to_http_url(&unit.media_url) }]
+    }
+}
+
+// End of isolated component
 
 fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
@@ -529,16 +553,6 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
                 })
         )
         .collect::<Vec<El<Msg>>>()]
-}
-
-fn unit_preview(unit: &AdUnit) -> El<Msg> {
-    if unit.media_mime.starts_with("video/") {
-        video![
-            attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true; At::Muted => true }
-        ]
-    } else {
-        img![attrs! { At::Src => to_http_url(&unit.media_url) }]
-    }
 }
 
 fn to_http_url(url: &str) -> String {
