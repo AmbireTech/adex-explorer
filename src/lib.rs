@@ -211,10 +211,6 @@ enum Msg {
     ChannelsLoaded(fetch::FetchObject<Vec<MarketChannel>>),
     VolumeLoaded(fetch::FetchObject<VolumeResp>),
     ImpressionsLoaded(fetch::FetchObject<VolumeResp>),
-    // OnFetchError{
-    //     label: &'static str,
-    //     fail_reason: fetch::FailReason,
-    // },
     SortSelected(String),
 }
 
@@ -234,23 +230,15 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         }
         Msg::BalanceLoaded(fetch_object) => match fetch_object.response() {
             Ok(response) => {
-                log!("Balance Loaded");
                 model.balance = Ready(response.data);
             },
             Err(fail_reason) => {
                 error!("Loading balance Failed : ", fail_reason);
-                // orders
-                //     .send_msg(Msg::OnFetchError {
-                //         label: "Fetching repository info failed",
-                //         fail_reason,
-                //     })
-                //     .skip();
             }
         },
         
         Msg::ChannelsLoaded(fetch_object) => match fetch_object.response() {
             Ok(response) => {
-                log!("Channels Loaded");
                 model.market_channels = Ready(response.data);
                 model.last_loaded = (js_sys::Date::now() as i64) / 1000;
             },
@@ -260,7 +248,6 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         },
         Msg::VolumeLoaded(fetch_object) => match fetch_object.response() {
             Ok(response) => {
-                log!("Volume Loaded");
                 model.volume = Ready(response.data);
             },
             Err(fail_reason) => {
@@ -269,7 +256,6 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         },
         Msg::ImpressionsLoaded(fetch_object) => match fetch_object.response() {
             Ok(response) => {
-                log!("Impressions Loaded");
                 model.impressions = Ready(response.data);
             },
             Err(fail_reason) => {
@@ -279,10 +265,6 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
-        // Msg::OnFetchError{ label, fail_reason } => {
-        //     error!(format!("Fetch error - {} - {:#?}", label, fail_reason));
-        //     orders.skip();
-        // },
     }
 }
 
@@ -291,9 +273,6 @@ fn view(model: &Model) -> Node<Msg> {
 
     let channels = match &model.market_channels {
         Loading => return h2!["Loading..."],
-        // return div![
-        //     h2!["Loading ..."]
-        // ],
         Ready(c) => c,
     };
     let total_impressions: u64 = channels
