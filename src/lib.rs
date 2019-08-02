@@ -10,7 +10,7 @@ use futures::Future;
 use lazysort::*;
 use num_format::{Locale, ToFormattedString};
 use seed::prelude::*;
-use seed::{Method, Request};
+use seed::{fetch, Method, Request};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -149,7 +149,7 @@ impl Default for ActionLoad {
     }
 }
 impl ActionLoad {
-    fn perform_effects(&self, orders: &mut Orders<Msg>) {
+    fn perform_effects(&self, orders: &mut impl Orders<Msg>) {
         match self {
             ActionLoad::Summary | ActionLoad::Channels => {
                 // Load on-chain balances
@@ -161,37 +161,29 @@ impl ActionLoad {
                     ETHERSCAN_API_KEY
                 );
                 orders.perform_cmd(
-                    Request::new(&etherscan_uri)
+                    Request::new(etherscan_uri)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::BalanceLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(Msg::BalanceLoaded),
                 );
 
                 // Load campaigns from the market
                 // @TODO request DAI channels only
                 orders.perform_cmd(
-                    Request::new(&format!("{}/campaigns?all", MARKET_URL))
+                    Request::new(format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::ChannelsLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(Msg::ChannelsLoaded),
                 );
 
                 // Load volume
                 orders.perform_cmd(
-                    Request::new(&VOLUME_URL)
+                    Request::new(VOLUME_URL)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::VolumeLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(Msg::VolumeLoaded),
                 );
                 orders.perform_cmd(
-                    Request::new(&IMPRESSIONS_URL)
+                    Request::new(IMPRESSIONS_URL)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::ImpressionsLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(Msg::ImpressionsLoaded),
                 );
             }
             // NOTE: not used yet
@@ -210,19 +202,23 @@ impl ActionLoad {
     }
 }
 
+
 #[derive(Clone)]
 enum Msg {
     Load(ActionLoad),
     Refresh,
-    BalanceLoaded(EtherscanBalResp),
-    ChannelsLoaded(Vec<MarketChannel>),
-    VolumeLoaded(VolumeResp),
-    ImpressionsLoaded(VolumeResp),
-    OnFetchErr(JsValue),
+    BalanceLoaded(fetch::FetchObject<EtherscanBalResp>),
+    ChannelsLoaded(fetch::FetchObject<Vec<MarketChannel>>),
+    VolumeLoaded(fetch::FetchObject<VolumeResp>),
+    ImpressionsLoaded(fetch::FetchObject<VolumeResp>),
+    // OnFetchError{
+    //     label: &'static str,
+    //     fail_reason: fetch::FailReason,
+    // },
     SortSelected(String),
 }
 
-fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Load(load_action) => {
             // Do not render
@@ -236,27 +232,70 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip();
             model.load_action.perform_effects(orders);
         }
-        Msg::BalanceLoaded(resp) => model.balance = Ready(resp),
-        Msg::ChannelsLoaded(channels) => {
-            model.market_channels = Ready(channels);
-            model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+        Msg::BalanceLoaded(fetch_object) => match fetch_object.response() {
+            Ok(response) => {
+                log!("Balance Loaded");
+                model.balance = Ready(response.data);
+            },
+            Err(fail_reason) => {
+                error!("Loading balance Failed : ", fail_reason);
+                // orders
+                //     .send_msg(Msg::OnFetchError {
+                //         label: "Fetching repository info failed",
+                //         fail_reason,
+                //     })
+                //     .skip();
+            }
+        },
+        
+        Msg::ChannelsLoaded(fetch_object) => match fetch_object.response() {
+            Ok(response) => {
+                log!("Channels Loaded");
+                model.market_channels = Ready(response.data);
+                model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+            },
+            Err(fail_reason) => {
+                error!("Loading channels Failed : ", fail_reason);
+            }
+        },
+        Msg::VolumeLoaded(fetch_object) => match fetch_object.response() {
+            Ok(response) => {
+                log!("Volume Loaded");
+                model.volume = Ready(response.data);
+            },
+            Err(fail_reason) => {
+                error!("Loading volume Failed : ", fail_reason);
+            }
+        },
+        Msg::ImpressionsLoaded(fetch_object) => match fetch_object.response() {
+            Ok(response) => {
+                log!("Impressions Loaded");
+                model.impressions = Ready(response.data);
+            },
+            Err(fail_reason) => {
+                error!("Loading impressions Failed : ", fail_reason);
+            }
         }
-        Msg::VolumeLoaded(vol) => model.volume = Ready(vol),
-        Msg::ImpressionsLoaded(vol) => model.impressions = Ready(vol),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
-        Msg::OnFetchErr(_) => (),
+        // Msg::OnFetchError{ label, fail_reason } => {
+        //     error!(format!("Fetch error - {} - {:#?}", label, fail_reason));
+        //     orders.skip();
+        // },
     }
 }
 
 // View
-fn view(model: &Model) -> El<Msg> {
+fn view(model: &Model) -> Node<Msg> {
+
     let channels = match &model.market_channels {
         Loading => return h2!["Loading..."],
+        // return div![
+        //     h2!["Loading ..."]
+        // ],
         Ready(c) => c,
     };
-
     let total_impressions: u64 = channels
         .iter()
         .map(|x| {
@@ -281,7 +320,7 @@ fn view(model: &Model) -> El<Msg> {
         .flat_map(|x| &x.spec.ad_units)
         .map(|x| &x.ipfs)
         .collect::<HashSet<_>>();
-
+    
     let unique_publishers = channels_dai
         .clone()
         .flat_map(|x| {
@@ -362,7 +401,7 @@ fn view(model: &Model) -> El<Msg> {
     ]
 }
 
-fn card(label: &str, value: Loadable<String>) -> El<Msg> {
+fn card(label: &str, value: Loadable<String>) -> Node<Msg> {
     div![
         class!["card"],
         match value {
@@ -373,7 +412,7 @@ fn card(label: &str, value: Loadable<String>) -> El<Msg> {
     ]
 }
 
-fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
+fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
     let min = values.clone().min()?;
     let max = values.clone().max()?;
@@ -413,7 +452,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     ])
 }
 
-fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> Node<Msg> {
     let (card_value, vol) = match (&val, vol) {
         (Ready(val), Ready(vol)) => (val, vol),
         _ => return card(card_label, Loading)
@@ -429,7 +468,7 @@ fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeRes
     }
 }
 
-fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Node<Msg> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -446,12 +485,12 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
 
     let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
-        .collect::<Vec<El<Msg>>>();
+        .collect::<Vec<Node<Msg>>>();
 
     table![channels]
 }
 
-fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
+fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
     let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
@@ -507,7 +546,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     ]
 }
 
-fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
+fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
     for channel in channels.iter() {
         for unit in channel.spec.ad_units.iter() {
@@ -543,10 +582,10 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
                     ]
                 })
         )
-        .collect::<Vec<El<Msg>>>()]
+        .collect::<Vec<Node<Msg>>>()]
 }
 
-fn unit_preview(unit: &AdUnit) -> El<Msg> {
+fn unit_preview(unit: &AdUnit) -> Node<Msg> {
     if unit.media_mime.starts_with("video/") {
         video![
             attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true; At::Muted => true }
@@ -584,10 +623,11 @@ fn dai_readable(bal: &BigNum) -> String {
 }
 
 // Router
-fn routes(url: &seed::Url) -> Msg {
-    match url.path.get(0).map(|x| x.as_ref()) {
+#[allow(clippy::needless_pass_by_value)]
+fn routes(url: seed::Url) -> Msg {
+    match url.path.get(0).map(String::as_str) {
         Some("channels") => Msg::Load(ActionLoad::Channels),
-        Some("channel") => match url.path.get(1) {
+        Some("channel") => match url.path.get(1).as_ref() {
             Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
             None => Msg::Load(ActionLoad::Summary),
         },
@@ -597,7 +637,7 @@ fn routes(url: &seed::Url) -> Msg {
 
 #[wasm_bindgen]
 pub fn render() {
-    let state = seed::App::build(Model::default(), update, view)
+    let state = seed::App::build(|_, _| Model::default(), update, view)
         .routes(routes)
         .finish()
         .run();
