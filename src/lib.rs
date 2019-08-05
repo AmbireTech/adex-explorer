@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use adex_domain::{AdUnit, BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
-use futures::Future;
 use lazysort::*;
 use num_format::{Locale, ToFormattedString};
 use seed::prelude::*;
 use seed::{Method, Request};
+use seed::fetch;
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -161,37 +161,29 @@ impl ActionLoad {
                     ETHERSCAN_API_KEY
                 );
                 orders.perform_cmd(
-                    Request::new(&etherscan_uri)
+                    Request::new(etherscan_uri)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::BalanceLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json_data(Msg::BalanceLoaded),
                 );
 
                 // Load campaigns from the market
                 // @TODO request DAI channels only
                 orders.perform_cmd(
-                    Request::new(&format!("{}/campaigns?all", MARKET_URL))
+                    Request::new(format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::ChannelsLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json_data(Msg::ChannelsLoaded),
                 );
 
                 // Load volume
                 orders.perform_cmd(
-                    Request::new(&VOLUME_URL)
+                    Request::new(String::from(VOLUME_URL))
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::VolumeLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json_data(Msg::VolumeLoaded),
                 );
                 orders.perform_cmd(
-                    Request::new(&IMPRESSIONS_URL)
+                    Request::new(String::from(IMPRESSIONS_URL))
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::ImpressionsLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json_data(Msg::ImpressionsLoaded),
                 );
             }
             // NOTE: not used yet
@@ -214,11 +206,10 @@ impl ActionLoad {
 enum Msg {
     Load(ActionLoad),
     Refresh,
-    BalanceLoaded(EtherscanBalResp),
-    ChannelsLoaded(Vec<MarketChannel>),
-    VolumeLoaded(VolumeResp),
-    ImpressionsLoaded(VolumeResp),
-    OnFetchErr(JsValue),
+    BalanceLoaded(fetch::ResponseDataResult<EtherscanBalResp>),
+    ChannelsLoaded(fetch::ResponseDataResult<Vec<MarketChannel>>),
+    VolumeLoaded(fetch::ResponseDataResult<VolumeResp>),
+    ImpressionsLoaded(fetch::ResponseDataResult<VolumeResp>),
     SortSelected(String),
 }
 
@@ -236,17 +227,18 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip();
             model.load_action.perform_effects(orders);
         }
-        Msg::BalanceLoaded(resp) => model.balance = Ready(resp),
-        Msg::ChannelsLoaded(channels) => {
+        Msg::BalanceLoaded(Ok(resp)) => model.balance = Ready(resp),
+        Msg::BalanceLoaded(Err(_)) => (),
+        Msg::ChannelsLoaded(Ok(channels)) => {
             model.market_channels = Ready(channels);
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
-        Msg::VolumeLoaded(vol) => model.volume = Ready(vol),
-        Msg::ImpressionsLoaded(vol) => model.impressions = Ready(vol),
-        Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
-        // @TODO handle this
-        // report via a toast
-        Msg::OnFetchErr(_) => (),
+        Msg::ChannelsLoaded(Err(_)) => (),
+        Msg::VolumeLoaded(Ok(vol)) => model.volume = Ready(vol),
+        Msg::VolumeLoaded(Err(_)) => (),
+        Msg::ImpressionsLoaded(Ok(vol)) => model.impressions = Ready(vol),
+        Msg::ImpressionsLoaded(Err(_)) => (),
+        Msg::SortSelected(sort_name) => model.sort = sort_name.into()
     }
 }
 
@@ -569,7 +561,7 @@ fn dai_readable(bal: &BigNum) -> String {
 }
 
 // Router
-fn routes(url: &seed::Url) -> Msg {
+fn routes(url: seed::Url) -> Msg {
     match url.path.get(0).map(|x| x.as_ref()) {
         Some("channels") => Msg::Load(ActionLoad::Channels),
         Some("channel") => match url.path.get(1) {
