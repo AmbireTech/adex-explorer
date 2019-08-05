@@ -228,16 +228,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             model.load_action.perform_effects(orders);
         }
         Msg::BalanceLoaded(Ok(resp)) => model.balance = Ready(resp),
-        Msg::BalanceLoaded(Err(_)) => (),
+        Msg::BalanceLoaded(Err(reason)) => log!("BalanceLoaded error:", reason),
         Msg::ChannelsLoaded(Ok(channels)) => {
             model.market_channels = Ready(channels);
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
-        Msg::ChannelsLoaded(Err(_)) => (),
+        Msg::ChannelsLoaded(Err(reason)) => log!("ChannelsLoaded error:", reason),
         Msg::VolumeLoaded(Ok(vol)) => model.volume = Ready(vol),
-        Msg::VolumeLoaded(Err(_)) => (),
+        Msg::VolumeLoaded(Err(reason)) => log!("VolumeLoaded error:", reason),
         Msg::ImpressionsLoaded(Ok(vol)) => model.impressions = Ready(vol),
-        Msg::ImpressionsLoaded(Err(_)) => (),
+        Msg::ImpressionsLoaded(Err(reason)) => log!("ImpressionsLoaded error:", reason),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into()
     }
 }
