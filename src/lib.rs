@@ -149,7 +149,7 @@ impl Default for ActionLoad {
     }
 }
 impl ActionLoad {
-    fn perform_effects(&self, orders: &mut Orders<Msg>) {
+    fn perform_effects(&self, orders: &mut impl Orders<Msg>) {
         match self {
             ActionLoad::Summary | ActionLoad::Channels => {
                 // Load on-chain balances
@@ -213,7 +213,7 @@ enum Msg {
     SortSelected(String),
 }
 
-fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Load(load_action) => {
             // Do not render
@@ -243,7 +243,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
 }
 
 // View
-fn view(model: &Model) -> El<Msg> {
+fn view(model: &Model) -> Node<Msg> {
     let channels = match &model.market_channels {
         Loading => return h2!["Loading..."],
         Ready(c) => c,
@@ -339,7 +339,7 @@ fn view(model: &Model) -> El<Msg> {
     ]
 }
 
-fn card(label: &str, value: Loadable<String>) -> El<Msg> {
+fn card(label: &str, value: Loadable<String>) -> Node<Msg> {
     div![
         class!["card"],
         match value {
@@ -350,7 +350,7 @@ fn card(label: &str, value: Loadable<String>) -> El<Msg> {
     ]
 }
 
-fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
+fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
     let min = values.clone().min()?;
     let max = values.clone().max()?;
@@ -390,7 +390,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     ])
 }
 
-fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> Node<Msg> {
     let (card_value, vol) = match (&val, vol) {
         (Ready(val), Ready(vol)) => (val, vol),
         _ => return card(card_label, Loading)
@@ -406,7 +406,7 @@ fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeRes
     }
 }
 
-fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Node<Msg> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -423,12 +423,12 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
 
     let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
-        .collect::<Vec<El<Msg>>>();
+        .collect::<Vec<Node<Msg>>>();
 
     table![channels]
 }
 
-fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
+fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
     let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
@@ -484,7 +484,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     ]
 }
 
-fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
+fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
     for channel in channels.iter() {
         for unit in channel.spec.ad_units.iter() {
@@ -520,10 +520,10 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
                     ]
                 })
         )
-        .collect::<Vec<El<Msg>>>()]
+        .collect::<Vec<Node<Msg>>>()]
 }
 
-fn unit_preview(unit: &AdUnit) -> El<Msg> {
+fn unit_preview(unit: &AdUnit) -> Node<Msg> {
     if unit.media_mime.starts_with("video/") {
         video![
             attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true; At::Muted => true }
@@ -574,7 +574,10 @@ fn routes(url: seed::Url) -> Msg {
 
 #[wasm_bindgen]
 pub fn render() {
-    let state = seed::App::build(Model::default(), update, view)
+    let state = seed::App::build(|url, orders| {
+        orders.send_msg(routes(url));
+        Model::default()
+    }, update, view)
         .routes(routes)
         .finish()
         .run();
