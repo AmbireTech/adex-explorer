@@ -275,14 +275,6 @@ fn view(model: &Model) -> Node<Msg> {
         Loading => return h2!["Loading..."],
         Ready(c) => c,
     };
-    let total_impressions: u64 = channels
-        .iter()
-        .map(|x| {
-            (&x.status.balances_sum() / &x.spec.min_per_impression)
-                .to_u64()
-                .unwrap_or(0)
-        })
-        .sum();
 
     let channels_dai = channels
         .iter()
@@ -316,12 +308,6 @@ fn view(model: &Model) -> Node<Msg> {
         card("Campaigns", Ready(channels.len().to_string())),
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
-        // @TODO warn that this is an estimation; add a question mark next to it
-        // to explain what an estimation means
-        card(
-            "Impressions",
-            Ready(total_impressions.to_formatted_string(&Locale::en))
-        ),
         volume_card(
             "Monthly impressions",
             match &model.impressions {
