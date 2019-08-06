@@ -14,7 +14,8 @@ use seed::{fetch, Method, Request};
 use serde::Deserialize;
 use std::collections::HashSet;
 
-const MARKET_URL: &str = "https://market.adex.network";
+// const MARKET_URL: &str = "https://market.adex.network";
+const MARKET_URL: &str = "http://localhost:4000";
 const VOLUME_URL: &str = "https://tom.adex.network/volume";
 const IMPRESSIONS_URL: &str = "https://tom.adex.network/volume/monthly-impressions";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
@@ -133,6 +134,78 @@ struct Model {
 }
 
 // Update
+#[derive(Clone)]
+enum FetchedData {
+    Balance{fetch_object: fetch::FetchObject<EtherscanBalResp>},
+    MarketChannels{fetch_object: fetch::FetchObject<Vec<MarketChannel>>},
+    Volume{fetch_object: fetch::FetchObject<VolumeResp>},
+    Impressions{fetch_object: fetch::FetchObject<VolumeResp>},
+}
+
+impl FetchedData {
+    fn interpret_fetched_data<T> (&self, fetch_object: fetch::FetchObject<T>, model: &mut Model, update_model: fn(&mut Model, Loadable<T>),) {
+        match fetch_object.response() {
+            Ok(response) => {
+                log!("response OK");
+                update_model(model, Ready(response.data));
+            }
+            Err(fail_reason) => {
+                error!("response failed");
+            }
+        }
+    }
+    
+    fn update_model(&self, model: &mut Model) {
+        match self {
+            FetchedData::Balance{fetch_object} => {
+                self.interpret_fetched_data(
+                    fetch_object.clone(),
+                    model,
+                    move |model, balance| {
+                        model.balance = balance;
+                    }
+                );
+                log!("update model.balance");
+                // model.balance = Ready(balance.clone());
+            },
+            FetchedData::MarketChannels{fetch_object} => {
+                self.interpret_fetched_data(
+                    fetch_object.clone(),
+                    model,
+                    move |model, market_channels| {
+                        model.market_channels = market_channels;
+                        model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+                    }
+                );
+                log!("update model.market_channels");
+                // model.market_channels = Ready(market_channels.clone());
+            },
+            FetchedData::Volume{fetch_object} => {
+                self.interpret_fetched_data(
+                    fetch_object.clone(),
+                    model,
+                    move |model, volume| {
+                        model.volume = volume;
+                    }
+                );
+                log!("update model.volume");
+                // model.market_channels = Ready(market_channels.clone());
+            },
+            FetchedData::Impressions{fetch_object} => {
+                self.interpret_fetched_data(
+                    fetch_object.clone(),
+                    model,
+                    move |model, impressions| {
+                        model.impressions = impressions;
+                    }
+                );
+                log!("update model.impressions");
+                // model.market_channels = Ready(market_channels.clone());
+            },
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 enum ActionLoad {
     // The summary includes latest campaigns on the market,
@@ -163,7 +236,8 @@ impl ActionLoad {
                 orders.perform_cmd(
                     Request::new(etherscan_uri)
                         .method(Method::Get)
-                        .fetch_json(Msg::BalanceLoaded),
+                        .fetch_json(move |fetch_object: fetch::FetchObject<EtherscanBalResp>| Msg::DataFetched(FetchedData::Balance{fetch_object})),
+
                 );
 
                 // Load campaigns from the market
@@ -171,25 +245,26 @@ impl ActionLoad {
                 orders.perform_cmd(
                     Request::new(format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
-                        .fetch_json(Msg::ChannelsLoaded),
+                        .fetch_json(move |fetch_object: fetch::FetchObject<Vec<MarketChannel>>| Msg::DataFetched(FetchedData::MarketChannels{fetch_object})),
                 );
 
                 // Load volume
                 orders.perform_cmd(
                     Request::new(VOLUME_URL)
                         .method(Method::Get)
-                        .fetch_json(Msg::VolumeLoaded),
+                        .fetch_json(move |fetch_object: fetch::FetchObject<VolumeResp>| Msg::DataFetched(FetchedData::Volume{fetch_object})),
                 );
+                // Load impressions
                 orders.perform_cmd(
                     Request::new(IMPRESSIONS_URL)
                         .method(Method::Get)
-                        .fetch_json(Msg::ImpressionsLoaded),
+                        .fetch_json(move |fetch_object: fetch::FetchObject<VolumeResp>| Msg::DataFetched(FetchedData::Impressions{fetch_object})),
                 );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
                 let market_uri = format!(
-                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
+                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",  
                     MARKET_URL,
                     &id,
                     // @TODO get rid of this default earner thing, it's very very temporary
@@ -207,10 +282,11 @@ impl ActionLoad {
 enum Msg {
     Load(ActionLoad),
     Refresh,
-    BalanceLoaded(fetch::FetchObject<EtherscanBalResp>),
-    ChannelsLoaded(fetch::FetchObject<Vec<MarketChannel>>),
-    VolumeLoaded(fetch::FetchObject<VolumeResp>),
-    ImpressionsLoaded(fetch::FetchObject<VolumeResp>),
+    DataFetched(FetchedData),
+    OnFetchError {
+        label: &'static str,
+        fail_reason: fetch::FailReason<String>,
+    },
     SortSelected(String),
 }
 
@@ -228,43 +304,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             orders.skip();
             model.load_action.perform_effects(orders);
         }
-        Msg::BalanceLoaded(fetch_object) => match fetch_object.response() {
-            Ok(response) => {
-                model.balance = Ready(response.data);
-            },
-            Err(fail_reason) => {
-                error!("Loading balance Failed : ", fail_reason);
-            }
+        Msg::DataFetched(fetched_data) => {
+            fetched_data.update_model(model);
         },
-        
-        Msg::ChannelsLoaded(fetch_object) => match fetch_object.response() {
-            Ok(response) => {
-                model.market_channels = Ready(response.data);
-                model.last_loaded = (js_sys::Date::now() as i64) / 1000;
-            },
-            Err(fail_reason) => {
-                error!("Loading channels Failed : ", fail_reason);
-            }
-        },
-        Msg::VolumeLoaded(fetch_object) => match fetch_object.response() {
-            Ok(response) => {
-                model.volume = Ready(response.data);
-            },
-            Err(fail_reason) => {
-                error!("Loading volume Failed : ", fail_reason);
-            }
-        },
-        Msg::ImpressionsLoaded(fetch_object) => match fetch_object.response() {
-            Ok(response) => {
-                model.impressions = Ready(response.data);
-            },
-            Err(fail_reason) => {
-                error!("Loading impressions Failed : ", fail_reason);
-            }
-        }
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
+        Msg::OnFetchError{label, fail_reason} => {
+            // TODO
+            // set error in model 
+        },
     }
 }
 
