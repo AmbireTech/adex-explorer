@@ -135,73 +135,41 @@ struct Model {
 
 // Update
 #[derive(Clone)]
-enum FetchedData {
-    Balance{fetch_object: fetch::FetchObject<EtherscanBalResp>},
-    MarketChannels{fetch_object: fetch::FetchObject<Vec<MarketChannel>>},
-    Volume{fetch_object: fetch::FetchObject<VolumeResp>},
-    Impressions{fetch_object: fetch::FetchObject<VolumeResp>},
+struct FetchDataStruct<T> {
+    pub fetch_object: fetch::FetchObject<T>,
+    pub update_model: fn(&mut Model, Loadable<T>),
 }
-
+#[derive(Clone)]
+enum FetchedData {
+    Balance(FetchDataStruct<EtherscanBalResp>),
+    MarketChannels(FetchDataStruct<Vec<MarketChannel>>),
+    Volume(FetchDataStruct<VolumeResp>),
+    Impressions(FetchDataStruct<VolumeResp>),
+}
+macro_rules! match_response {
+    ($fetch_object:expr, $model:expr, $update_model:expr) => {
+        match $fetch_object.clone().response() {
+                    Ok(response) => {
+                        log!("response OK");
+                        $update_model($model, Ready(response.data));
+                    }
+                    Err(fail_reason) => {
+                        error!("response failed");
+                    }
+                }
+    };
+}
 impl FetchedData {
-    fn interpret_fetched_data<T> (&self, fetch_object: fetch::FetchObject<T>, model: &mut Model, update_model: fn(&mut Model, Loadable<T>),) {
-        match fetch_object.response() {
-            Ok(response) => {
-                log!("response OK");
-                update_model(model, Ready(response.data));
-            }
-            Err(fail_reason) => {
-                error!("response failed");
-            }
-        }
-    }
-    
-    fn update_model(&self, model: &mut Model) {
+    fn on_response(&self, model: &mut Model) {
         match self {
-            FetchedData::Balance{fetch_object} => {
-                self.interpret_fetched_data(
-                    fetch_object.clone(),
-                    model,
-                    move |model, balance| {
-                        model.balance = balance;
-                    }
-                );
-                log!("update model.balance");
-                // model.balance = Ready(balance.clone());
-            },
-            FetchedData::MarketChannels{fetch_object} => {
-                self.interpret_fetched_data(
-                    fetch_object.clone(),
-                    model,
-                    move |model, market_channels| {
-                        model.market_channels = market_channels;
-                        model.last_loaded = (js_sys::Date::now() as i64) / 1000;
-                    }
-                );
-                log!("update model.market_channels");
-                // model.market_channels = Ready(market_channels.clone());
-            },
-            FetchedData::Volume{fetch_object} => {
-                self.interpret_fetched_data(
-                    fetch_object.clone(),
-                    model,
-                    move |model, volume| {
-                        model.volume = volume;
-                    }
-                );
-                log!("update model.volume");
-                // model.market_channels = Ready(market_channels.clone());
-            },
-            FetchedData::Impressions{fetch_object} => {
-                self.interpret_fetched_data(
-                    fetch_object.clone(),
-                    model,
-                    move |model, impressions| {
-                        model.impressions = impressions;
-                    }
-                );
-                log!("update model.impressions");
-                // model.market_channels = Ready(market_channels.clone());
-            },
+            &FetchedData::Balance(ref fetch_data_struct) => 
+                match_response!(fetch_data_struct.fetch_object, model, fetch_data_struct.update_model),
+            &FetchedData::MarketChannels(ref fetch_data_struct) => 
+                match_response!(fetch_data_struct.fetch_object, model, fetch_data_struct.update_model),
+            &FetchedData::Volume(ref fetch_data_struct) => 
+                match_response!(fetch_data_struct.fetch_object, model, fetch_data_struct.update_model),
+            &FetchedData::Impressions(ref fetch_data_struct) => 
+                match_response!(fetch_data_struct.fetch_object, model, fetch_data_struct.update_model),
         }
     }
 }
@@ -236,8 +204,19 @@ impl ActionLoad {
                 orders.perform_cmd(
                     Request::new(etherscan_uri)
                         .method(Method::Get)
-                        .fetch_json(move |fetch_object: fetch::FetchObject<EtherscanBalResp>| Msg::DataFetched(FetchedData::Balance{fetch_object})),
-
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<EtherscanBalResp>| 
+                            Msg::DataFetched(
+                                FetchedData::Balance(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, balance| {
+                                            model.balance = balance;
+                                        },
+                                    }
+                                )
+                            )
+                        ),
                 );
 
                 // Load campaigns from the market
@@ -245,20 +224,61 @@ impl ActionLoad {
                 orders.perform_cmd(
                     Request::new(format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
-                        .fetch_json(move |fetch_object: fetch::FetchObject<Vec<MarketChannel>>| Msg::DataFetched(FetchedData::MarketChannels{fetch_object})),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<Vec<MarketChannel>>| 
+                            Msg::DataFetched(
+                                FetchedData::MarketChannels(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, market_channels| {
+                                            model.market_channels = market_channels;
+                                            model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+                                        },
+                                    }
+                                )
+                            )
+                        ),
+                        // .fetch_json(move |fetch_object: fetch::FetchObject<Vec<MarketChannel>>| Msg::DataFetched(FetchedData::MarketChannels(fetch_object))),
                 );
 
                 // Load volume
                 orders.perform_cmd(
                     Request::new(VOLUME_URL)
                         .method(Method::Get)
-                        .fetch_json(move |fetch_object: fetch::FetchObject<VolumeResp>| Msg::DataFetched(FetchedData::Volume{fetch_object})),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<VolumeResp>| 
+                            Msg::DataFetched(
+                                FetchedData::Volume(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, volume| {
+                                            model.volume = volume;
+                                        },
+                                    }
+                                )
+                            )
+                        ),
+                        // .fetch_json(move |fetch_object: fetch::FetchObject<VolumeResp>| Msg::DataFetched(FetchedData::Volume(fetch_object))),
                 );
+
                 // Load impressions
                 orders.perform_cmd(
                     Request::new(IMPRESSIONS_URL)
                         .method(Method::Get)
-                        .fetch_json(move |fetch_object: fetch::FetchObject<VolumeResp>| Msg::DataFetched(FetchedData::Impressions{fetch_object})),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<VolumeResp>| 
+                            Msg::DataFetched(
+                                FetchedData::Impressions(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, impressions| {
+                                            model.impressions = impressions;
+                                        },
+                                    }
+                                )
+                            )
+                        ),
+                        // .fetch_json(move |fetch_object: fetch::FetchObject<VolumeResp>| Msg::DataFetched(FetchedData::Impressions(fetch_object))),
                 );
             }
             // NOTE: not used yet
@@ -305,7 +325,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             model.load_action.perform_effects(orders);
         }
         Msg::DataFetched(fetched_data) => {
-            fetched_data.update_model(model);
+            fetched_data.on_response(model);
         },
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
