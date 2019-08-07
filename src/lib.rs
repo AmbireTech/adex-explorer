@@ -84,7 +84,6 @@ struct EtherscanBalResp {
     pub result: BigNum,
 }
 
-// Model
 enum Loadable<T> {
     Loading,
     Ready(T),
@@ -119,7 +118,9 @@ impl From<String> for ChannelSort {
         }
     }
 }
-
+///
+/// Model
+/// 
 #[derive(Default)]
 struct Model {
     pub load_action: ActionLoad,
@@ -135,6 +136,9 @@ struct Model {
     pub loading_status: Loadable<String>,
     pub errors: Vec<Error>,
 }
+///
+/// check_status : use to cumulate the status of different kind of loadable data
+/// 
 macro_rules! check_status {
     ($field:expr, $nb_err:expr, $nb_loading:expr) => (
         match $field {
@@ -145,6 +149,12 @@ macro_rules! check_status {
     )
 }
 impl Model {
+    ///
+    /// fn refresh_global_status : compute the global status, according to the respective status of Loadable data
+    /// - if at least one data is in Error, global status is Error
+    /// - else, if at least one data is in Loading, global status is Loading
+    /// - otherwise global status is OK
+    /// 
     fn refresh_global_status(&mut self) {
         let mut nb_err:i32 = 0;
         let mut nb_loading:i32 = 0;
@@ -152,7 +162,6 @@ impl Model {
         check_status!(self.balance, nb_err, nb_loading);
         check_status!(self.volume, nb_err, nb_loading);
         check_status!(self.impressions, nb_err, nb_loading);
-        log!(format!("nb_err={}, nb_loading={}", nb_err, nb_loading));
         self.loading_status = 
             if nb_err == 0 {
                 if nb_loading == 0 {
@@ -165,6 +174,9 @@ impl Model {
                 Error
             }
     }
+    ///
+    /// fn add_error : to record a new error in the model
+    /// 
     fn add_error(&mut self, error: Error) {
         self.errors.push(error);
         // avoid to have to many errors in the list : when it reachs 40, only keep the 20 last ones
@@ -556,6 +568,9 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     model.refresh_global_status();
 }
 
+///
+/// fn recursive_view_error_details : loops recursively over the suberrors of an error
+/// 
 fn recursive_view_error_details(details: &mut Vec<String>) -> Node<Msg> {
     if details.len() == 0 {
         return empty![];
@@ -587,6 +602,9 @@ fn recursive_view_error_details(details: &mut Vec<String>) -> Node<Msg> {
     }
 }
 
+///
+/// fn view_errors : to display the list of errors, if any
+/// 
 fn view_errors(model: &Model) -> Node<Msg> {
     if model.errors.len() > 0 {
         div![
