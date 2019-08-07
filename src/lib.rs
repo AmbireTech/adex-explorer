@@ -5,12 +5,13 @@ use std::collections::HashMap;
 
 use adex_domain::{AdUnit, BigNum, Channel, ChannelSpec};
 use chrono::serde::ts_milliseconds;
-use chrono::{DateTime, Utc};
-use futures::Future;
+use chrono::{DateTime, Utc, TimeZone};
+use js_sys;
+use std::convert::TryInto;
 use lazysort::*;
 use num_format::{Locale, ToFormattedString};
 use seed::prelude::*;
-use seed::{Method, Request};
+use seed::{fetch, Method, Request};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -83,10 +84,10 @@ struct EtherscanBalResp {
     pub result: BigNum,
 }
 
-// Model
 enum Loadable<T> {
     Loading,
     Ready(T),
+    Error,
 }
 impl<T> Default for Loadable<T> {
     fn default() -> Self {
@@ -117,7 +118,9 @@ impl From<String> for ChannelSort {
         }
     }
 }
-
+///
+/// Model
+/// 
 #[derive(Default)]
 struct Model {
     pub load_action: ActionLoad,
@@ -130,9 +133,250 @@ struct Model {
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
+    pub loading_status: Loadable<String>,
+    pub errors: Vec<Error>,
+}
+///
+/// check_status : use to cumulate the status of different kind of loadable data
+/// 
+macro_rules! check_status {
+    ($field:expr, $nb_err:expr, $nb_loading:expr) => (
+        match $field {
+            Error => $nb_err += 1,
+            Loading => $nb_loading += 1,
+            _ => (),
+        }
+    )
+}
+impl Model {
+    ///
+    /// fn refresh_global_status : compute the global status, according to the respective status of Loadable data
+    /// - if at least one data is in Error, global status is Error
+    /// - else, if at least one data is in Loading, global status is Loading
+    /// - otherwise global status is OK
+    /// 
+    fn refresh_global_status(&mut self) {
+        let mut nb_err:i32 = 0;
+        let mut nb_loading:i32 = 0;
+        check_status!(self.market_channels, nb_err, nb_loading);
+        check_status!(self.balance, nb_err, nb_loading);
+        check_status!(self.volume, nb_err, nb_loading);
+        check_status!(self.impressions, nb_err, nb_loading);
+        self.loading_status = 
+            if nb_err == 0 {
+                if nb_loading == 0 {
+                    self.errors.clear();
+                    Ready("".to_string())
+                } else { 
+                    Loading
+                }
+            } else {
+                Error
+            }
+    }
+    ///
+    /// fn add_error : to record a new error in the model
+    /// 
+    fn add_error(&mut self, error: Error) {
+        self.errors.push(error);
+        // avoid to have to many errors in the list : when it reachs 40, only keep the 20 last ones
+        if self.errors.len() >= 40 {
+            self.errors = self.errors.split_off(20);
+        }
+    }
+}
+
+type Cdate = chrono::DateTime<chrono::Utc>;
+
+/// Wrap the Chrono date, with a simpler API, and compatibility with features not supported
+/// for it with the wasm target.
+/// For now, utc only.
+///
+/// 1-based month and day indexing.
+#[derive(Clone)]
+pub struct Date {
+    wrapped: Cdate,
+}
+
+impl From<Cdate> for Date {
+    fn from(date: Cdate) -> Self {
+        Self { wrapped: date }
+    }
+}
+
+impl Date {
+    pub fn new(year: i32, month: u32, day: u32, hours: u32, minutes: u32, seconds: u32, milliseconds: u32) -> Self {
+        Self {
+            wrapped: Utc.ymd(year, month, day).and_hms_milli(hours, minutes, seconds, milliseconds),
+        }
+    }
+
+    /// We use js_sys::Date, serialize it, then turn it into a Chrono date, due to limitations
+    /// with Crono on the wasm target.
+    pub fn now() -> Self {
+        let now_js = js_sys::Date::new_0();
+
+        Self::new(
+            now_js
+                .get_utc_full_year()
+                .try_into()
+                .expect("casting js year into chrono year failed"),
+            now_js.get_utc_month() as u32 + 1, // JS using 0-based month indexing. Fix it.
+            now_js.get_utc_date() as u32,
+            now_js.get_utc_hours() as u32,
+            now_js.get_utc_minutes() as u32,
+            now_js.get_utc_seconds() as u32,
+            now_js.get_utc_milliseconds() as u32,
+        )
+    }
+    pub fn to_time_string(&self) -> String {
+        return self.wrapped.to_string();
+    }
+}
+
+struct Error {
+    // pub time: DateTime<Utc>, // can't use Chrono in wasm target, see https://github.com/chronotope/chrono/issues/243
+    pub time: Date,
+    pub summary: String,
+    pub details: Vec<String>,
+}
+impl Error {
+    fn new(summary: String) -> Self {
+        Self {
+            time: Date::now(),
+            summary: summary,
+            details: Vec::new()
+        }
+    }
+    fn new_with_details(summary: String, details: String) -> Self {
+        Self {
+            time: Date::now(),
+            summary: summary,
+            details: vec![details]
+        }
+    }
+    fn new_with_suberror(summary: String, suberror: Error) -> Self {
+        let mut details: Vec<_> = suberror.details.clone();
+        details.append(&mut vec![suberror.summary]);
+        Self {
+            time: Date::now(),
+            summary: summary,
+            details: details
+        }
+    }
+    fn to_time_string(&self) -> String {
+        return self.time.to_time_string();
+    }
 }
 
 // Update
+
+///
+/// struct FetchDataStruct : store data about a given kind of information to be fetched with fetch_json(), used to deal with the fetch response
+/// 
+#[derive(Clone)]
+struct FetchDataStruct<T> {
+    pub fetch_object: fetch::FetchObject<T>,
+    // update_model callback is called if the fetch response is OK, in order to update the model according to the fetch data
+    pub update_model: fn(&mut Model, Loadable<T>),
+    // on_error callback is called if the fetch response in NOK, in order to deal with the error according to the information requested
+    pub on_error: fn(&mut Model, Error),
+}
+impl<T> FetchDataStruct<T> {
+    ///
+    /// fn on_fetch_response : implement treatment dealing with the fetch reponse
+    /// 
+    fn on_fetch_response (self, model: &mut Model, info_type: &str) {
+        match self.fetch_object.response() {
+            Ok(response) => {
+            // response OK, call update_model() callback
+                (self.update_model)(model, Ready(response.data));
+            }
+            Err(fail_reason) => {
+            // response NOK. Analyse the error type, get the details and then call on_error() callback
+                let error: Error = match fail_reason {
+                    fetch::FailReason::RequestError(request_error, fetch_object) => {
+                        let fetch::RequestError::DomException(dom_exception) = request_error;
+                        error!(dom_exception);
+                        Error::new_with_details(
+                            format!("The request has been aborted (timed out or network error)"), 
+                            format!("'{}'", dom_exception.message()),
+                        )
+                    }
+                    fetch::FailReason::DataError(data_error, _) => {
+                        match data_error {
+                            fetch::DataError::DomException(dom_exception) => {
+                                error!(dom_exception);
+                                Error::new_with_details(
+                                    format!("[DataError] Converting body to String failed"), 
+                                    format!("{}:{}", dom_exception.name(), dom_exception.message()),
+                                )
+                            }
+                            fetch::DataError::SerdeError(serde_error, json) => {
+                                error!(serde_error);
+                                Error::new_with_details(
+                                    format!("[DataError] Invalid data received for '{}':\n  {}", info_type, serde_error), 
+                                    format!("{}", json),
+                                )
+                            }
+                        }
+                    }
+                    fetch::FailReason::Status(_, fetch_object) => {
+                        // response isn't ok, but maybe contains error messages - try to decode them:
+                        match fetch_object.result.unwrap().data {
+                            Err(fetch::DataError::SerdeError(_, json)) => {
+                                error!(json);
+                                Error::new_with_details(
+                                    format!("The server returned an error"), 
+                                    format!("{}", json),
+                                )
+                            },
+                            data => {
+                                Error::new_with_details(
+                                    format!("Status Error with data"), 
+                                    format!(""),
+                                )
+                            }
+                        }
+                    }
+                };
+                (self.on_error)(model, error);
+            }
+        }
+    }
+}
+///
+/// enum FetchedData : used to store the FetchDataStruct value in message Msg::DataFetched, when calling fetch_json(), according to the kind of information requested
+/// 
+#[derive(Clone)]
+enum FetchedData {
+    // for requesting balance
+    Balance(FetchDataStruct<EtherscanBalResp>),
+    // for requesting market_channels
+    MarketChannels(FetchDataStruct<Vec<MarketChannel>>),
+    // for requesting volume
+    Volume(FetchDataStruct<VolumeResp>),
+    // for requesting impressions
+    Impressions(FetchDataStruct<VolumeResp>),
+}
+impl FetchedData {
+    ///
+    /// fn on_response : is called when the fetch request is finished, in order to deal with the response
+    /// 
+    fn on_response(&self, model: &mut Model) {
+        match self {
+            FetchedData::Balance(fetch_data_struct) => 
+                fetch_data_struct.clone().on_fetch_response(model, "Balance"),
+            &FetchedData::MarketChannels(ref fetch_data_struct) => 
+                fetch_data_struct.clone().on_fetch_response(model, "Market channels"),
+            &FetchedData::Volume(ref fetch_data_struct) => 
+                fetch_data_struct.clone().on_fetch_response(model, "Volume"),
+            &FetchedData::Impressions(ref fetch_data_struct) => 
+                fetch_data_struct.clone().on_fetch_response(model, "Impressions"),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 enum ActionLoad {
     // The summary includes latest campaigns on the market,
@@ -149,7 +393,7 @@ impl Default for ActionLoad {
     }
 }
 impl ActionLoad {
-    fn perform_effects(&self, orders: &mut Orders<Msg>) {
+    fn perform_effects(&self, orders: &mut impl Orders<Msg>) {
         match self {
             ActionLoad::Summary | ActionLoad::Channels => {
                 // Load on-chain balances
@@ -161,43 +405,122 @@ impl ActionLoad {
                     ETHERSCAN_API_KEY
                 );
                 orders.perform_cmd(
-                    Request::new(&etherscan_uri)
+                    Request::new(etherscan_uri)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::BalanceLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<EtherscanBalResp>| 
+                            Msg::DataFetched(
+                                FetchedData::Balance(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, balance| {
+                                            model.balance = balance;
+                                        },
+                                        on_error: move |model, error| {
+                                            model.balance = Loadable::Error;
+                                            error!("Fetching Balance failed ...");
+                                            let new_error = Error::new_with_suberror(
+                                                format!("Fetching Balance failed from URL:'{}'", ETHERSCAN_URL),
+                                                error
+                                            );
+                                            model.add_error(new_error);
+                                        },
+                                    }
+                                )
+                            )
+                        ),
                 );
 
                 // Load campaigns from the market
                 // @TODO request DAI channels only
                 orders.perform_cmd(
-                    Request::new(&format!("{}/campaigns?all", MARKET_URL))
+                    Request::new(format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::ChannelsLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<Vec<MarketChannel>>| 
+                            Msg::DataFetched(
+                                FetchedData::MarketChannels(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, market_channels| {
+                                            model.market_channels = market_channels;
+                                            model.last_loaded = (js_sys::Date::now() as i64) / 1000;
+                                        },
+                                        on_error: move |model, error| {
+                                            model.market_channels = Loadable::Error;
+                                            error!("Fetching Market Channels failed ...");
+                                            let new_error = Error::new_with_suberror(
+                                                format!("Fetching Market Channels failed from URL:'{}'", MARKET_URL),
+                                                error
+                                            );
+                                            model.add_error(new_error);
+                                        },
+                                    }
+                                )
+                            )
+                        ),
                 );
 
                 // Load volume
                 orders.perform_cmd(
-                    Request::new(&VOLUME_URL)
+                    Request::new(VOLUME_URL)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::VolumeLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<VolumeResp>| 
+                            Msg::DataFetched(
+                                FetchedData::Volume(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, volume| {
+                                            model.volume = volume;
+                                        },
+                                        on_error: move |model, error| {
+                                            model.volume = Loadable::Error;
+                                            error!("Fetching Volume failed ...");
+                                            let new_error = Error::new_with_suberror(
+                                                format!("Fetching Volume failed from URL:'{}'", VOLUME_URL),
+                                                error
+                                            );
+                                            model.add_error(new_error);
+                                        },
+                                    }
+                                )
+                            )
+                        ),
                 );
+
+                // Load impressions
                 orders.perform_cmd(
-                    Request::new(&IMPRESSIONS_URL)
+                    Request::new(IMPRESSIONS_URL)
                         .method(Method::Get)
-                        .fetch_json()
-                        .map(Msg::ImpressionsLoaded)
-                        .map_err(Msg::OnFetchErr),
+                        .fetch_json(
+                            move |fetch_object: fetch::FetchObject<VolumeResp>| 
+                            Msg::DataFetched(
+                                FetchedData::Impressions(
+                                    FetchDataStruct {
+                                        fetch_object: fetch_object,
+                                        update_model: move |model, impressions| {
+                                            model.impressions = impressions;
+                                        },
+                                        on_error: move |model, error| {
+                                            model.impressions = Loadable::Error;
+                                            error!("Fetching Impressions failed ...");
+                                            let new_error = Error::new_with_suberror(
+                                                format!("Fetching Impressions failed from URL:'{}'", IMPRESSIONS_URL),
+                                                error
+                                            );
+                                            model.add_error(new_error);
+                                        },
+                                    }
+                                )
+                            )
+                        ),
                 );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
                 let market_uri = format!(
-                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
+                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",  
                     MARKET_URL,
                     &id,
                     // @TODO get rid of this default earner thing, it's very very temporary
@@ -210,19 +533,17 @@ impl ActionLoad {
     }
 }
 
+
 #[derive(Clone)]
 enum Msg {
     Load(ActionLoad),
     Refresh,
-    BalanceLoaded(EtherscanBalResp),
-    ChannelsLoaded(Vec<MarketChannel>),
-    VolumeLoaded(VolumeResp),
-    ImpressionsLoaded(VolumeResp),
-    OnFetchErr(JsValue),
+    // DataFetched is the unique message to be notified after a fetch request. However the FetchedData value indicates which type of information has been requested
+    DataFetched(FetchedData),
     SortSelected(String),
 }
 
-fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::Load(load_action) => {
             // Do not render
@@ -236,59 +557,140 @@ fn update(msg: Msg, model: &mut Model, orders: &mut Orders<Msg>) {
             orders.skip();
             model.load_action.perform_effects(orders);
         }
-        Msg::BalanceLoaded(resp) => model.balance = Ready(resp),
-        Msg::ChannelsLoaded(channels) => {
-            model.market_channels = Ready(channels);
-            model.last_loaded = (js_sys::Date::now() as i64) / 1000;
-        }
-        Msg::VolumeLoaded(vol) => model.volume = Ready(vol),
-        Msg::ImpressionsLoaded(vol) => model.impressions = Ready(vol),
+        Msg::DataFetched(fetched_data) => {
+            fetched_data.on_response(model);
+        },
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
         // @TODO handle this
         // report via a toast
-        Msg::OnFetchErr(_) => (),
+    }
+    // Compute the model global status
+    model.refresh_global_status();
+}
+
+///
+/// fn recursive_view_error_details : loops recursively over the suberrors of an error
+/// 
+fn recursive_view_error_details(details: &mut Vec<String>) -> Node<Msg> {
+    if details.len() == 0 {
+        return empty![];
+    }
+    let detail_option = details.pop();
+    match detail_option {
+        None => {
+            error!("Unable to pop error from the errors list");
+            empty![]
+        },
+        Some(detail) => {
+            match details.len() {
+                0 => { // details is now empty, finish with a simple div with class "error-details"
+                    div![class!["error-details"], detail]
+                },
+                _ => { // remaining details after, call recusrsively and insert a details/summary block
+                    div![
+                        class!["suberror"],
+                        details![
+                            summary![
+                                detail
+                            ],
+                            recursive_view_error_details(details)
+                        ]
+                    ]
+                },
+            }
+        }
+    }
+}
+
+///
+/// fn view_errors : to display the list of errors, if any
+/// 
+fn view_errors(model: &Model) -> Node<Msg> {
+    if model.errors.len() > 0 {
+        div![
+            class!["errors-section"],
+            details![
+                summary![
+                    class!["errors-section-title"],
+                    "You have errors !"
+                ],
+                model.errors.iter().map(|error|
+                    div![
+                        class!["error-block"],
+                        details![
+                            summary![
+                                class!["error-summary"],
+                                format!("[{}] {}", error.time.to_time_string(), error.summary)
+                            ],
+                            recursive_view_error_details(&mut error.details.clone())
+                        ]
+                    ]
+                ),
+            ]
+        ]
+    } else {
+        empty![]
     }
 }
 
 // View
-fn view(model: &Model) -> El<Msg> {
-    let channels = match &model.market_channels {
+fn view(model: &Model) -> Node<Msg> {
+
+    match &model.market_channels {
         Loading => return h2!["Loading..."],
-        Ready(c) => c,
+        _ => {},
     };
 
-    let channels_dai = channels
-        .iter()
-        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
+    // create a Loadable for channels_dai to be reused later in the function
+    let is_channels_dai = match &model.market_channels {
+        Ready(channels) => Ready(channels.iter().filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR)),
+        Loading => Loading,
+        Error => Error,
+    };
 
-    let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
-    let total_deposit = channels_dai
-        .clone()
-        .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
-        .sum();
-
-    let unique_units = &channels
-        .iter()
-        .flat_map(|x| &x.spec.ad_units)
-        .map(|x| &x.ipfs)
-        .collect::<HashSet<_>>();
-
-    let unique_publishers = channels_dai
-        .clone()
-        .flat_map(|x| {
-            x.status
-                .balances
-                .keys()
-                .filter(|k| **k != x.creator)
-                .collect::<Vec<_>>()
-        })
-        .collect::<HashSet<_>>();
 
     div![
         // Cards
-        card("Campaigns", Ready(channels.len().to_string())),
-        card("Ad units", Ready(unique_units.len().to_string())),
-        card("Publishers", Ready(unique_publishers.len().to_string())),
+        card(
+            "Campaigns",
+            match &model.market_channels {
+                Ready(channels) => Ready(channels.len().to_string()),
+                Loading => Loading,
+                Error => Error,
+            }
+        ),
+        card("Ad units",
+            match &model.market_channels {
+                Ready(channels) => {
+                    let unique_units = &channels
+                        .iter()
+                        .flat_map(|x| &x.spec.ad_units)
+                        .map(|x| &x.ipfs)
+                        .collect::<HashSet<_>>();
+                    Ready(unique_units.len().to_string())
+                },
+                Loading => Loading,
+                Error => Error,
+            }
+        ),
+        card("Publishers",
+        match &is_channels_dai {
+                Ready(channels_dai) => {
+                    let unique_publishers = channels_dai.clone()
+                        .flat_map(|x| {
+                            x.status
+                                .balances
+                                .keys()
+                                .filter(|k| **k != x.creator)
+                                .collect::<Vec<_>>()
+                        })
+                        .collect::<HashSet<_>>();
+                    Ready(unique_publishers.len().to_string())
+                },
+                Loading => Loading,
+                Error => Error,
+            }
+        ),
         volume_card(
             "Monthly impressions",
             match &model.impressions {
@@ -299,22 +701,45 @@ fn view(model: &Model) -> El<Msg> {
                     .to_u64()
                     .unwrap_or(0)
                     .to_formatted_string(&Locale::en)),
-                Loading => Loading
+                Loading => Loading,
+                Error => Error,
             },
             &model.impressions
         ),
         br![],
-        card("Total campaign deposits", Ready(dai_readable(&total_deposit))),
-        card("Paid out", Ready(dai_readable(&total_paid))),
+        card("Total campaign deposits",
+            match &is_channels_dai {
+                Ready(channels_dai) => {
+                    let total_deposit = channels_dai.clone()
+                        .map(|MarketChannel { deposit_amount, .. }| deposit_amount)
+                        .sum();
+                    Ready(dai_readable(&total_deposit))
+                },
+                Loading => Loading,
+                Error => Error,
+            }
+        ),
+        card("Paid out",
+            match &is_channels_dai {
+                Ready(channels_dai) => {
+                    let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
+                    Ready(dai_readable(&total_paid))
+                },
+                Loading => Loading,
+                Error => Error,
+            }
+        ),
         card("Locked up on-chain", match &model.balance {
             Ready(resp) => Ready(dai_readable(&resp.result)),
-            Loading => Loading
+            Loading => Loading,
+            Error => Error,
         }),
         volume_card(
             "24h volume",
             match &model.volume {
                 Ready(vol) => Ready(dai_readable(&vol.aggr.iter().map(|x| &x.value).sum())),
-                Loading => Loading
+                Loading => Loading,
+                Error => Error,
             },
             &model.volume
         ),
@@ -328,37 +753,48 @@ fn view(model: &Model) -> El<Msg> {
                     option![attrs! {At::Value => "created"}, "Sort by created"],
                     input_ev(Ev::Input, Msg::SortSelected)
                 ],
-                channel_table(
-                    model.last_loaded,
-                    &channels_dai
-                        .clone()
-                        .sorted_by(|x, y| match model.sort {
-                            ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
-                            ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
-                            ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
-                        })
-                        .collect::<Vec<_>>()
-                ),
+                match &is_channels_dai {
+                    Ready(channels_dai) => {
+                        channel_table(
+                            model.last_loaded,
+                            &channels_dai.clone()
+                                .sorted_by(|x, y| match model.sort {
+                                    ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
+                                    ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
+                                    ChannelSort::Created => y.spec.created.cmp(&x.spec.created),
+                                })
+                                .collect::<Vec<_>>()
+                        )
+                    },
+                    _ => empty![],
+                },
             ]
         } else {
             seed::empty()
         },
-        ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
+        match &is_channels_dai {
+            Ready(channels_dai) => ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
+            _ => empty![],
+        },
+        view_errors(model)
     ]
 }
 
-fn card(label: &str, value: Loadable<String>) -> El<Msg> {
+fn card(label: &str, value: Loadable<String>) -> Node<Msg> {
     div![
         class!["card"],
         match value {
             Loading => div![class!["card-value loading"]],
             Ready(value) => div![class!["card-value"], value],
+            Error => {
+                div![class!["card-error-value"], "N/A"]
+            },
         },
         div![class!["card-label"], label],
     ]
 }
 
-fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
+fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
     let min = values.clone().min()?;
     let max = values.clone().max()?;
@@ -398,7 +834,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<El<Msg>> {
     ])
 }
 
-fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> El<Msg> {
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> Node<Msg> {
     let (card_value, vol) = match (&val, vol) {
         (Ready(val), Ready(vol)) => (val, vol),
         _ => return card(card_label, Loading)
@@ -414,7 +850,7 @@ fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeRes
     }
 }
 
-fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
+fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Node<Msg> {
     let header = tr![
         td!["URL"],
         td!["USD estimate"],
@@ -431,12 +867,12 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> El<Msg> {
 
     let channels = std::iter::once(header)
         .chain(channels.iter().map(|c| channel(last_loaded, c)))
-        .collect::<Vec<El<Msg>>>();
+        .collect::<Vec<Node<Msg>>>();
 
     table![channels]
 }
 
-fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
+fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
     let deposit_amount = &channel.deposit_amount;
     let paid_total = channel.status.balances_sum();
     let url = format!(
@@ -492,7 +928,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> El<Msg> {
     ]
 }
 
-fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
+fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
     for channel in channels.iter() {
         for unit in channel.spec.ad_units.iter() {
@@ -528,10 +964,10 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> El<Msg> {
                     ]
                 })
         )
-        .collect::<Vec<El<Msg>>>()]
+        .collect::<Vec<Node<Msg>>>()]
 }
 
-fn unit_preview(unit: &AdUnit) -> El<Msg> {
+fn unit_preview(unit: &AdUnit) -> Node<Msg> {
     if unit.media_mime.starts_with("video/") {
         video![
             attrs! { At::Src => to_http_url(&unit.media_url); At::AutoPlay => true; At::Loop => true; At::Muted => true }
@@ -569,20 +1005,30 @@ fn dai_readable(bal: &BigNum) -> String {
 }
 
 // Router
-fn routes(url: &seed::Url) -> Msg {
-    match url.path.get(0).map(|x| x.as_ref()) {
+#[allow(clippy::needless_pass_by_value)]
+fn routes(url: seed::Url) -> Msg {
+    match url.path.get(0).map(String::as_str) {
         Some("channels") => Msg::Load(ActionLoad::Channels),
-        Some("channel") => match url.path.get(1) {
+        Some("channel") => match url.path.get(1).as_ref() {
             Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
             None => Msg::Load(ActionLoad::Summary),
         },
         _ => Msg::Load(ActionLoad::Summary),
     }
 }
+// ------ ------
+//     Init : to force the initial route according to the URL (necessary since seed 0.4.0 - PR #189 'scalable application support'')
+//             https://github.com/David-OConnor/seed/pull/189#issuecomment-517747635
+// ------ ------
+
+fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
+    orders.send_msg(routes(url));
+    Model::default()
+}
 
 #[wasm_bindgen]
 pub fn render() {
-    let state = seed::App::build(Model::default(), update, view)
+    let state = seed::App::build(init, update, view)
         .routes(routes)
         .finish()
         .run();

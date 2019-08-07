@@ -68,3 +68,52 @@ table tr.full {
   background-position: 80%;
 }
 
+.card-error-value {
+  color: red;
+  font-size: 2em;
+  position: relative;
+}
+
+.errors-section {
+  position: absolute;
+  max-height: 50%;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1rem;
+  background-color: lightgray;
+  text-align: left;
+  border-style: inset;
+}
+
+.errors-section-title {
+	font-size: x-large;
+	font-weight: bold;
+	display: inline;
+}
+
+.error-block {
+  border-right: 1px solid #f44336;
+  border-top: 1px solid #f44336;
+  border-left: 1px solid #f44336;
+  border-bottom: 1px solid #f44336;
+  margin-left: 15px;
+}
+
+.error-title {
+	font-weight: bold;
+	font-style: normal;
+}
+
+.suberror {
+	margin-left: 15px;
+	font-style: normal;
+}
+
+.error-details {
+	margin-left: 15px;
+	font-style: italic;
+	max-height: 50%;
+	overflow: visible;
+}
+
