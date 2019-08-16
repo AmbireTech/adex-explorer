@@ -306,10 +306,13 @@ fn view(model: &Model) -> El<Msg> {
         br![],
         card("Total campaign deposits", Ready(dai_readable(&total_deposit))),
         card("Paid out", Ready(dai_readable(&total_paid))),
-        card("Locked up on-chain", match &model.balance {
-            Ready(resp) => Ready(dai_readable(&resp.result)),
-            Loading => Loading
-        }),
+        a![
+            attrs! { At::Href => format!("https://etherscan.io/address/{}#tokentxns", CORE_ADDR) },
+            card("Locked up on-chain", match &model.balance {
+                Ready(resp) => Ready(dai_readable(&resp.result)),
+                Loading => Loading
+            }),
+        ],
         volume_card(
             "24h volume",
             match &model.volume {
