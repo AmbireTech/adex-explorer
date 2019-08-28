@@ -9,51 +9,59 @@
         return wasm.render();
     };
 
-    let cachedTextDecoder = new TextDecoder('utf-8');
-
-    let cachegetUint8Memory = null;
-    function getUint8Memory() {
-        if (cachegetUint8Memory === null || cachegetUint8Memory.buffer !== wasm.memory.buffer) {
-            cachegetUint8Memory = new Uint8Array(wasm.memory.buffer);
-        }
-        return cachegetUint8Memory;
-    }
-
-    function getStringFromWasm(ptr, len) {
-        return cachedTextDecoder.decode(getUint8Memory().subarray(ptr, ptr + len));
-    }
-
-    __exports.__wbg_error_4bb6c2a97407129a = function(arg0, arg1) {
-        let varg0 = getStringFromWasm(arg0, arg1);
-
-        varg0 = varg0.slice();
-        wasm.__wbindgen_free(arg0, arg1 * 1);
-
-        console.error(varg0);
-    };
-
     const heap = new Array(32);
 
     heap.fill(undefined);
 
     heap.push(undefined, null, true, false);
 
-    let heap_next = heap.length;
-
-    function addHeapObject(obj) {
-        if (heap_next === heap.length) heap.push(heap.length + 1);
-        const idx = heap_next;
-        heap_next = heap[idx];
-
-        heap[idx] = obj;
-        return idx;
-    }
-
-    __exports.__wbg_new_59cb74e423758ede = function() {
-        return addHeapObject(new Error());
-    };
-
 function getObject(idx) { return heap[idx]; }
+
+__exports.__wbg_setTimeout_b5c6f2e532fdecb1 = function(arg0, arg1) {
+    return setTimeout(getObject(arg0), arg1);
+};
+
+__exports.__wbg_clearTimeout_2ecf0d5334867bfa = function(arg0) {
+    clearTimeout(arg0);
+};
+
+let cachedTextDecoder = new TextDecoder('utf-8');
+
+let cachegetUint8Memory = null;
+function getUint8Memory() {
+    if (cachegetUint8Memory === null || cachegetUint8Memory.buffer !== wasm.memory.buffer) {
+        cachegetUint8Memory = new Uint8Array(wasm.memory.buffer);
+    }
+    return cachegetUint8Memory;
+}
+
+function getStringFromWasm(ptr, len) {
+    return cachedTextDecoder.decode(getUint8Memory().subarray(ptr, ptr + len));
+}
+
+__exports.__wbg_error_4bb6c2a97407129a = function(arg0, arg1) {
+    let varg0 = getStringFromWasm(arg0, arg1);
+
+    varg0 = varg0.slice();
+    wasm.__wbindgen_free(arg0, arg1 * 1);
+
+    console.error(varg0);
+};
+
+let heap_next = heap.length;
+
+function addHeapObject(obj) {
+    if (heap_next === heap.length) heap.push(heap.length + 1);
+    const idx = heap_next;
+    heap_next = heap[idx];
+
+    heap[idx] = obj;
+    return idx;
+}
+
+__exports.__wbg_new_59cb74e423758ede = function() {
+    return addHeapObject(new Error());
+};
 
 let WASM_VECTOR_LEN = 0;
 
@@ -132,14 +140,6 @@ __exports.__wbg_stack_558ba5917b466edd = function(ret, arg0) {
 
 };
 
-__exports.__widl_f_error_1_ = function(arg0) {
-    console.error(getObject(arg0));
-};
-
-__exports.__widl_f_log_1_ = function(arg0) {
-    console.log(getObject(arg0));
-};
-
 function handleError(exnptr, e) {
     const view = getUint32Memory();
     view[exnptr / 4] = 1;
@@ -199,6 +199,18 @@ __exports.__widl_f_get_element_by_id_Document = function(arg0, arg1, arg2) {
 };
 
 __exports.__widl_instanceof_Element = function(idx) { return getObject(idx) instanceof Element ? 1 : 0; };
+
+__exports.__widl_f_closest_Element = function(arg0, arg1, arg2, exnptr) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    try {
+
+        const val = getObject(arg0).closest(varg1);
+        return isLikeNone(val) ? 0 : addHeapObject(val);
+
+    } catch (e) {
+        handleError(exnptr, e);
+    }
+};
 
 __exports.__widl_f_get_attribute_Element = function(ret, arg0, arg1, arg2) {
     let varg1 = getStringFromWasm(arg1, arg2);
@@ -271,19 +283,49 @@ __exports.__widl_f_remove_event_listener_with_callback_EventTarget = function(ar
 
 __exports.__widl_instanceof_HTMLButtonElement = function(idx) { return getObject(idx) instanceof HTMLButtonElement ? 1 : 0; };
 
-__exports.__widl_f_set_autofocus_HTMLButtonElement = function(arg0, arg1) {
-    getObject(arg0).autofocus = arg1 !== 0;
+__exports.__widl_f_value_HTMLButtonElement = function(ret, arg0) {
+
+    const retptr = passStringToWasm(getObject(arg0).value);
+    const retlen = WASM_VECTOR_LEN;
+    const mem = getUint32Memory();
+    mem[ret / 4] = retptr;
+    mem[ret / 4 + 1] = retlen;
+
+};
+
+__exports.__widl_f_set_value_HTMLButtonElement = function(arg0, arg1, arg2) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    getObject(arg0).value = varg1;
+};
+
+__exports.__widl_instanceof_HTMLDataElement = function(idx) { return getObject(idx) instanceof HTMLDataElement ? 1 : 0; };
+
+__exports.__widl_f_value_HTMLDataElement = function(ret, arg0) {
+
+    const retptr = passStringToWasm(getObject(arg0).value);
+    const retlen = WASM_VECTOR_LEN;
+    const mem = getUint32Memory();
+    mem[ret / 4] = retptr;
+    mem[ret / 4 + 1] = retlen;
+
+};
+
+__exports.__widl_f_set_value_HTMLDataElement = function(arg0, arg1, arg2) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    getObject(arg0).value = varg1;
+};
+
+__exports.__widl_instanceof_HTMLElement = function(idx) { return getObject(idx) instanceof HTMLElement ? 1 : 0; };
+
+__exports.__widl_f_focus_HTMLElement = function(arg0, exnptr) {
+    try {
+        getObject(arg0).focus();
+    } catch (e) {
+        handleError(exnptr, e);
+    }
 };
 
 __exports.__widl_instanceof_HTMLInputElement = function(idx) { return getObject(idx) instanceof HTMLInputElement ? 1 : 0; };
-
-__exports.__widl_f_set_autofocus_HTMLInputElement = function(arg0, arg1) {
-    getObject(arg0).autofocus = arg1 !== 0;
-};
-
-__exports.__widl_f_checked_HTMLInputElement = function(arg0) {
-    return getObject(arg0).checked;
-};
 
 __exports.__widl_f_set_checked_HTMLInputElement = function(arg0, arg1) {
     getObject(arg0).checked = arg1 !== 0;
@@ -292,16 +334,6 @@ __exports.__widl_f_set_checked_HTMLInputElement = function(arg0, arg1) {
 __exports.__widl_f_type_HTMLInputElement = function(ret, arg0) {
 
     const retptr = passStringToWasm(getObject(arg0).type);
-    const retlen = WASM_VECTOR_LEN;
-    const mem = getUint32Memory();
-    mem[ret / 4] = retptr;
-    mem[ret / 4 + 1] = retlen;
-
-};
-
-__exports.__widl_f_default_value_HTMLInputElement = function(ret, arg0) {
-
-    const retptr = passStringToWasm(getObject(arg0).defaultValue);
     const retlen = WASM_VECTOR_LEN;
     const mem = getUint32Memory();
     mem[ret / 4] = retptr;
@@ -324,11 +356,94 @@ __exports.__widl_f_set_value_HTMLInputElement = function(arg0, arg1, arg2) {
     getObject(arg0).value = varg1;
 };
 
-__exports.__widl_instanceof_HTMLSelectElement = function(idx) { return getObject(idx) instanceof HTMLSelectElement ? 1 : 0; };
+__exports.__widl_instanceof_HTMLLIElement = function(idx) { return getObject(idx) instanceof HTMLLIElement ? 1 : 0; };
 
-__exports.__widl_f_set_autofocus_HTMLSelectElement = function(arg0, arg1) {
-    getObject(arg0).autofocus = arg1 !== 0;
+__exports.__widl_f_value_HTMLLIElement = function(arg0) {
+    return getObject(arg0).value;
 };
+
+__exports.__widl_f_set_value_HTMLLIElement = function(arg0, arg1) {
+    getObject(arg0).value = arg1;
+};
+
+__exports.__widl_instanceof_HTMLMenuItemElement = function(idx) { return getObject(idx) instanceof HTMLMenuItemElement ? 1 : 0; };
+
+__exports.__widl_f_set_checked_HTMLMenuItemElement = function(arg0, arg1) {
+    getObject(arg0).checked = arg1 !== 0;
+};
+
+__exports.__widl_instanceof_HTMLMeterElement = function(idx) { return getObject(idx) instanceof HTMLMeterElement ? 1 : 0; };
+
+__exports.__widl_f_value_HTMLMeterElement = function(arg0) {
+    return getObject(arg0).value;
+};
+
+__exports.__widl_f_set_value_HTMLMeterElement = function(arg0, arg1) {
+    getObject(arg0).value = arg1;
+};
+
+__exports.__widl_instanceof_HTMLOptionElement = function(idx) { return getObject(idx) instanceof HTMLOptionElement ? 1 : 0; };
+
+__exports.__widl_f_value_HTMLOptionElement = function(ret, arg0) {
+
+    const retptr = passStringToWasm(getObject(arg0).value);
+    const retlen = WASM_VECTOR_LEN;
+    const mem = getUint32Memory();
+    mem[ret / 4] = retptr;
+    mem[ret / 4 + 1] = retlen;
+
+};
+
+__exports.__widl_f_set_value_HTMLOptionElement = function(arg0, arg1, arg2) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    getObject(arg0).value = varg1;
+};
+
+__exports.__widl_instanceof_HTMLOutputElement = function(idx) { return getObject(idx) instanceof HTMLOutputElement ? 1 : 0; };
+
+__exports.__widl_f_value_HTMLOutputElement = function(ret, arg0) {
+
+    const retptr = passStringToWasm(getObject(arg0).value);
+    const retlen = WASM_VECTOR_LEN;
+    const mem = getUint32Memory();
+    mem[ret / 4] = retptr;
+    mem[ret / 4 + 1] = retlen;
+
+};
+
+__exports.__widl_f_set_value_HTMLOutputElement = function(arg0, arg1, arg2) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    getObject(arg0).value = varg1;
+};
+
+__exports.__widl_instanceof_HTMLParamElement = function(idx) { return getObject(idx) instanceof HTMLParamElement ? 1 : 0; };
+
+__exports.__widl_f_value_HTMLParamElement = function(ret, arg0) {
+
+    const retptr = passStringToWasm(getObject(arg0).value);
+    const retlen = WASM_VECTOR_LEN;
+    const mem = getUint32Memory();
+    mem[ret / 4] = retptr;
+    mem[ret / 4 + 1] = retlen;
+
+};
+
+__exports.__widl_f_set_value_HTMLParamElement = function(arg0, arg1, arg2) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    getObject(arg0).value = varg1;
+};
+
+__exports.__widl_instanceof_HTMLProgressElement = function(idx) { return getObject(idx) instanceof HTMLProgressElement ? 1 : 0; };
+
+__exports.__widl_f_value_HTMLProgressElement = function(arg0) {
+    return getObject(arg0).value;
+};
+
+__exports.__widl_f_set_value_HTMLProgressElement = function(arg0, arg1) {
+    getObject(arg0).value = arg1;
+};
+
+__exports.__widl_instanceof_HTMLSelectElement = function(idx) { return getObject(idx) instanceof HTMLSelectElement ? 1 : 0; };
 
 __exports.__widl_f_value_HTMLSelectElement = function(ret, arg0) {
 
@@ -347,10 +462,6 @@ __exports.__widl_f_set_value_HTMLSelectElement = function(arg0, arg1, arg2) {
 
 __exports.__widl_instanceof_HTMLTextAreaElement = function(idx) { return getObject(idx) instanceof HTMLTextAreaElement ? 1 : 0; };
 
-__exports.__widl_f_set_autofocus_HTMLTextAreaElement = function(arg0, arg1) {
-    getObject(arg0).autofocus = arg1 !== 0;
-};
-
 __exports.__widl_f_value_HTMLTextAreaElement = function(ret, arg0) {
 
     const retptr = passStringToWasm(getObject(arg0).value);
@@ -364,6 +475,24 @@ __exports.__widl_f_value_HTMLTextAreaElement = function(ret, arg0) {
 __exports.__widl_f_set_value_HTMLTextAreaElement = function(arg0, arg1, arg2) {
     let varg1 = getStringFromWasm(arg1, arg2);
     getObject(arg0).value = varg1;
+};
+
+__exports.__widl_f_new_Headers = function(exnptr) {
+    try {
+        return addHeapObject(new Headers());
+    } catch (e) {
+        handleError(exnptr, e);
+    }
+};
+
+__exports.__widl_f_append_Headers = function(arg0, arg1, arg2, arg3, arg4, exnptr) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    let varg3 = getStringFromWasm(arg3, arg4);
+    try {
+        getObject(arg0).append(varg1, varg3);
+    } catch (e) {
+        handleError(exnptr, e);
+    }
 };
 
 __exports.__widl_f_push_state_with_url_History = function(arg0, arg1, arg2, arg3, arg4, arg5, exnptr) {
@@ -417,6 +546,8 @@ __exports.__widl_f_hash_Location = function(ret, arg0, exnptr) {
         handleError(exnptr, e);
     }
 };
+
+__exports.__widl_instanceof_Node = function(idx) { return getObject(idx) instanceof Node ? 1 : 0; };
 
 __exports.__widl_f_append_child_Node = function(arg0, arg1, exnptr) {
     try {
@@ -479,6 +610,20 @@ __exports.__widl_f_state_PopStateEvent = function(arg0) {
     return addHeapObject(getObject(arg0).state);
 };
 
+__exports.__widl_f_status_Response = function(arg0) {
+    return getObject(arg0).status;
+};
+
+__exports.__widl_f_status_text_Response = function(ret, arg0) {
+
+    const retptr = passStringToWasm(getObject(arg0).statusText);
+    const retlen = WASM_VECTOR_LEN;
+    const mem = getUint32Memory();
+    mem[ret / 4] = retptr;
+    mem[ret / 4 + 1] = retlen;
+
+};
+
 __exports.__widl_f_text_Response = function(arg0, exnptr) {
     try {
         return addHeapObject(getObject(arg0).text());
@@ -488,6 +633,22 @@ __exports.__widl_f_text_Response = function(arg0, exnptr) {
 };
 
 __exports.__widl_instanceof_Window = function(idx) { return getObject(idx) instanceof Window ? 1 : 0; };
+
+__exports.__widl_f_cancel_animation_frame_Window = function(arg0, arg1, exnptr) {
+    try {
+        getObject(arg0).cancelAnimationFrame(arg1);
+    } catch (e) {
+        handleError(exnptr, e);
+    }
+};
+
+__exports.__widl_f_request_animation_frame_Window = function(arg0, arg1, exnptr) {
+    try {
+        return getObject(arg0).requestAnimationFrame(getObject(arg1));
+    } catch (e) {
+        handleError(exnptr, e);
+    }
+};
 
 __exports.__widl_f_document_Window = function(arg0) {
 
@@ -519,6 +680,14 @@ __exports.__widl_f_set_interval_with_callback_and_timeout_and_arguments_0_Window
     } catch (e) {
         handleError(exnptr, e);
     }
+};
+
+__exports.__widl_f_error_1_ = function(arg0) {
+    console.error(getObject(arg0));
+};
+
+__exports.__widl_f_log_1_ = function(arg0) {
+    console.log(getObject(arg0));
 };
 
 __exports.__wbg_newnoargs_a172f39151049128 = function(arg0, arg1) {
@@ -563,7 +732,7 @@ __exports.__wbg_new_7884206509213d02 = function(arg0, arg1) {
         }
 
     };
-    cbarg0.f = wasm.__wbg_function_table.get(220);
+    cbarg0.f = wasm.__wbg_function_table.get(410);
     cbarg0.a = arg0;
     cbarg0.b = arg1;
     try {
@@ -709,9 +878,9 @@ __exports.__wbindgen_throw = function(ptr, len) {
     throw new Error(getStringFromWasm(ptr, len));
 };
 
-__exports.__wbindgen_closure_wrapper231 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(58);
-    const d = wasm.__wbg_function_table.get(59);
+__exports.__wbindgen_closure_wrapper228 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(48);
+    const d = wasm.__wbg_function_table.get(49);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
@@ -733,9 +902,57 @@ __exports.__wbindgen_closure_wrapper231 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper645 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(171);
-    const d = wasm.__wbg_function_table.get(172);
+__exports.__wbindgen_closure_wrapper230 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(52);
+    const d = wasm.__wbg_function_table.get(49);
+    const cb = function(arg0) {
+        this.cnt++;
+        let a = this.a;
+        this.a = 0;
+        try {
+            return f(a, b, arg0);
+
+        } finally {
+            if (--this.cnt === 0) d(a, b);
+            else this.a = a;
+
+        }
+
+    };
+    cb.a = a;
+    cb.cnt = 1;
+    let real = cb.bind(cb);
+    real.original = cb;
+    return addHeapObject(real);
+};
+
+__exports.__wbindgen_closure_wrapper879 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(320);
+    const d = wasm.__wbg_function_table.get(321);
+    const cb = function() {
+        this.cnt++;
+        let a = this.a;
+        this.a = 0;
+        try {
+            return f(a, b);
+
+        } finally {
+            if (--this.cnt === 0) d(a, b);
+            else this.a = a;
+
+        }
+
+    };
+    cb.a = a;
+    cb.cnt = 1;
+    let real = cb.bind(cb);
+    real.original = cb;
+    return addHeapObject(real);
+};
+
+__exports.__wbindgen_closure_wrapper881 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(320);
+    const d = wasm.__wbg_function_table.get(321);
     const cb = function() {
         this.cnt++;
         try {
@@ -754,9 +971,9 @@ real.original = cb;
 return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper922 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(194);
-    const d = wasm.__wbg_function_table.get(195);
+__exports.__wbindgen_closure_wrapper1293 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(384);
+    const d = wasm.__wbg_function_table.get(385);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
