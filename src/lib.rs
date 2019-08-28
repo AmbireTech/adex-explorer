@@ -489,7 +489,8 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
 
 fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
     let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
-    for channel in channels.iter().filter(|x| x.status.status_type == MarketStatusType::Active) {
+    let active = channels.iter().filter(|x| x.status.status_type == MarketStatusType::Active);
+    for channel in active {
         for unit in channel.spec.ad_units.iter() {
             units_by_type
                 .entry(&unit.ad_type)
@@ -503,7 +504,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
             let total_per_impression: BigNum = all.iter().map(|x| &x.spec.min_per_impression).sum();
             // @TODO needs weighted avg
             let avg_per_impression = total_per_impression.div_floor(&(all.len() as u64).into());
-            let total_vol: BigNum = all.iter().map(|x| x.deposit_amount - x.status.balances_sum()).sum();
+            let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount - &x.status.balances_sum()).sum();
             (ad_type, avg_per_impression, total_vol)
         })
         .sorted_by(|x, y| y.1.cmp(&x.1))
