@@ -5,6 +5,48 @@ use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
+// Volume response from the validator
+#[derive(Deserialize, Clone, Debug)]
+pub struct VolumeResp {
+    pub aggr: Vec<VolDataPoint>,
+}
+#[derive(Deserialize, Clone, Debug)]
+pub struct VolDataPoint {
+    pub value: BigNum,
+    pub time: DateTime<Utc>,
+}
+
+// Etherscan API
+#[derive(Deserialize, Clone, Debug)]
+pub struct EtherscanBalResp {
+    pub result: BigNum,
+}
+
+// Model
+pub enum Loadable<T> {
+    Loading,
+    Ready(T),
+}
+impl<T> Default for Loadable<T> {
+    fn default() -> Self {
+        Loadable::Loading
+    }
+}
+
+
+#[derive(Clone, Copy)]
+pub enum ChannelSort {
+    Deposit,
+    Status,
+    Created,
+}
+
+impl Default for ChannelSort {
+    fn default() -> Self {
+        ChannelSort::Deposit
+    }
+}
+
 // Data structs specific to the market
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MarketStatusType {
