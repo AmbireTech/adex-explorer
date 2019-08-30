@@ -10,9 +10,9 @@ pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
 	let mut units_by_type = HashMap::<&str, (Vec<&MarketChannel>, Vec<&MarketChannel>)>::new();
 	for channel in channels {
 		for unit in channel.spec.ad_units.iter() {
-				let units  = units_by_type
-					.entry(&unit.ad_type)
-					.or_insert((vec![], vec![]));
+		    	let units = units_by_type
+				    .entry(&unit.ad_type)
+				    .or_insert((vec![], vec![]));
 
 			units.0.push(channel);
 			if channel.status.status_type == MarketStatusType::Active {
@@ -37,7 +37,8 @@ pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
 
 			let all_deposits: BigNum = active.iter().map(|x| &x.deposit_amount).sum();
 
-			let avg_weighted_per_impression = all_by_impression.div_floor(&all_deposits);
+                        
+			let avg_weighted_per_impression = if all_deposits == 0.into() { all_deposits } else { all_by_impression.div_floor(&all_deposits) };
 			(
 				ad_type,
 				avg_weighted_per_impression,
