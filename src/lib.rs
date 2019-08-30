@@ -15,14 +15,14 @@ use serde::Deserialize;
 use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
-const VOLUME_URL: &str = "https://tom.adex.network/volume";
-const IMPRESSIONS_URL: &str = "https://tom.adex.network/volume/monthly-impressions";
+const ANALYTICS_URL: &str = "https://tom.adex.network/analytics";
+const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
-const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
+// const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
 const REFRESH_MS: i32 = 30000;
 
 // Data structs specific to the market
@@ -66,13 +66,13 @@ struct MarketChannel {
     pub spec: ChannelSpec,
 }
 
-// Volume response from the validator
+// Analytics response from the validator
 #[derive(Deserialize, Clone, Debug)]
-struct VolumeResp {
-    pub aggr: Vec<VolDataPoint>,
+struct AnalyticsResp {
+    pub aggr: Vec<AnalyticsDataPoint>,
 }
 #[derive(Deserialize, Clone, Debug)]
-struct VolDataPoint {
+struct AnalyticsDataPoint {
     pub value: BigNum,
     pub time: DateTime<Utc>,
 }
@@ -125,8 +125,8 @@ struct Model {
     // Market channels & balance: for the summaries page
     pub market_channels: Loadable<Vec<MarketChannel>>,
     pub balance: Loadable<EtherscanBalResp>,
-    pub volume: Loadable<VolumeResp>,
-    pub impressions: Loadable<VolumeResp>,
+    pub analytics: Loadable<AnalyticsResp>,
+    pub impressions: Loadable<AnalyticsResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -174,11 +174,11 @@ impl ActionLoad {
                         .fetch_json_data(Msg::ChannelsLoaded),
                 );
 
-                // Load volume
+                // Load analytics
                 orders.perform_cmd(
-                    Request::new(String::from(VOLUME_URL))
+                    Request::new(String::from(ANALYTICS_URL))
                         .method(Method::Get)
-                        .fetch_json_data(Msg::VolumeLoaded),
+                        .fetch_json_data(Msg::AnalyticsLoaded),
                 );
                 orders.perform_cmd(
                     Request::new(String::from(IMPRESSIONS_URL))
@@ -189,12 +189,9 @@ impl ActionLoad {
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
                 let market_uri = format!(
-                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
+                    "{}/analytics/{}?timeframe=hour&limit=168",
                     MARKET_URL,
                     &id,
-                    // @TODO get rid of this default earner thing, it's very very temporary
-                    // we should get an aggr of all earners
-                    DEFAULT_EARNER
                 );
                 // @TODO
             }
@@ -208,8 +205,8 @@ enum Msg {
     Refresh,
     BalanceLoaded(fetch::ResponseDataResult<EtherscanBalResp>),
     ChannelsLoaded(fetch::ResponseDataResult<Vec<MarketChannel>>),
-    VolumeLoaded(fetch::ResponseDataResult<VolumeResp>),
-    ImpressionsLoaded(fetch::ResponseDataResult<VolumeResp>),
+    AnalyticsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
+    ImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     SortSelected(String),
 }
 
@@ -234,9 +231,9 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
         Msg::ChannelsLoaded(Err(reason)) => log!("ChannelsLoaded error:", reason),
-        Msg::VolumeLoaded(Ok(vol)) => model.volume = Ready(vol),
-        Msg::VolumeLoaded(Err(reason)) => log!("VolumeLoaded error:", reason),
-        Msg::ImpressionsLoaded(Ok(vol)) => model.impressions = Ready(vol),
+        Msg::AnalyticsLoaded(Ok(analytics)) => model.analytics = Ready(analytics),
+        Msg::AnalyticsLoaded(Err(reason)) => log!("AnalyticsLoaded error:", reason),
+        Msg::ImpressionsLoaded(Ok(analytics)) => model.impressions = Ready(analytics),
         Msg::ImpressionsLoaded(Err(reason)) => log!("ImpressionsLoaded error:", reason),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into()
     }
@@ -281,10 +278,10 @@ fn view(model: &Model) -> Node<Msg> {
         card("Campaigns", Ready(channels.len().to_string())),
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
-        volume_card(
+        analytics_card(
             "Monthly impressions",
             match &model.impressions {
-                Ready(vol) => Ready(vol.aggr
+                Ready(analytics) => Ready(analytics.aggr
                     .iter()
                     .map(|x| &x.value)
                     .sum::<BigNum>()
@@ -305,13 +302,13 @@ fn view(model: &Model) -> Node<Msg> {
                 Loading => Loading
             }),
         ],
-        volume_card(
-            "24h volume",
-            match &model.volume {
-                Ready(vol) => Ready(dai_readable(&vol.aggr.iter().map(|x| &x.value).sum())),
+        analytics_card(
+            "24h analytics",
+            match &model.analytics {
+                Ready(analytics) => Ready(dai_readable(&analytics.aggr.iter().map(|x| &x.value).sum())),
                 Loading => Loading
             },
-            &model.volume
+            &model.analytics
         ),
         // Tables
         if model.load_action == ActionLoad::Channels {
@@ -353,8 +350,8 @@ fn card(label: &str, value: Loadable<String>) -> Node<Msg> {
     ]
 }
 
-fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
-    let values = vol.aggr.iter().map(|x| &x.value);
+fn analytics_chart(analytics: &AnalyticsResp) -> Option<Node<Msg>> {
+    let values = analytics.aggr.iter().map(|x| &x.value);
     let min = values.clone().min()?;
     let max = values.clone().max()?;
     let range = max - min;
@@ -368,7 +365,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
                 .to_u64()
                 .unwrap_or(0)
         })
-        .take(vol.aggr.len() - 1)
+        .take(analytics.aggr.len() - 1)
         .collect::<Vec<_>>();
     let len = points.len() as u64;
     let ratio = width as f64 / (len - 1) as f64;
@@ -393,12 +390,12 @@ fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
     ])
 }
 
-fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> Node<Msg> {
-    let (card_value, vol) = match (&val, vol) {
-        (Ready(val), Ready(vol)) => (val, vol),
+fn analytics_card(card_label: &str, val: Loadable<String>, analytics: &Loadable<AnalyticsResp>) -> Node<Msg> {
+    let (card_value, analytics) = match (&val, analytics) {
+        (Ready(val), Ready(analytics)) => (val, analytics),
         _ => return card(card_label, Loading)
     };
-    match volume_chart(vol) {
+    match analytics_chart(analytics) {
         Some(chart) => div![
             class!["card chart"],
             chart,
@@ -510,7 +507,7 @@ fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
         .sorted_by(|x, y| y.1.cmp(&x.1))
         .collect::<Vec<_>>();
 
-    let header = tr![td!["Ad Size"], td!["CPM"], td!["Active volume"],];
+    let header = tr![td!["Ad Size"], td!["CPM"], td!["Active analytics"],];
 
     table![std::iter::once(header)
         .chain(
