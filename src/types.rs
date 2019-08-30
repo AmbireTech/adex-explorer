@@ -33,7 +33,6 @@ impl<T> Default for Loadable<T> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub enum ChannelSort {
     Deposit,
