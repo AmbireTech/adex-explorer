@@ -7,39 +7,35 @@ use std::collections::HashMap;
 use types::{MarketChannel, MarketStatusType};
 
 pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
-	let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
-	let mut units_by_type_all = HashMap::<&str, Vec<&MarketChannel>>::new();
+	let mut units_by_type = HashMap::<&str, (Vec<&MarketChannel>, Vec<&MarketChannel>)>::new();
 	for channel in channels {
 		for unit in channel.spec.ad_units.iter() {
-			if channel.status.status_type == MarketStatusType::Active {
-				units_by_type
+				let units  = units_by_type
 					.entry(&unit.ad_type)
-					.or_insert(vec![])
-					.push(channel);
-			}
+					.or_insert((vec![], vec![]));
 
-			units_by_type_all
-				.entry(&unit.ad_type)
-				.or_insert(vec![])
-				.push(channel);
+			units.0.push(channel);
+			if channel.status.status_type == MarketStatusType::Active {
+				units.1.push(channel);
+			}
 		}
 	}
 
 	let units_by_type_stats = units_by_type
 		.iter()
-		.map(|(ad_type, all)| {
-			// let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount).sum();
-			let total_active_vol: BigNum = all
+		.map(|(ad_type, (all, active))| {
+			let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount).sum();
+			let total_active_vol: BigNum = active
 				.iter()
 				.map(|x| &x.deposit_amount - &x.status.balances_sum())
 				.sum();
 
-			let all_by_impression: BigNum = all
+			let all_by_impression: BigNum = active
 				.iter()
 				.map(|x| &x.deposit_amount * &x.spec.min_per_impression)
 				.sum();
 
-			let all_deposits: BigNum = all.iter().map(|x| &x.deposit_amount).sum();
+			let all_deposits: BigNum = active.iter().map(|x| &x.deposit_amount).sum();
 
 			let avg_weighted_per_impression = all_by_impression.div_floor(&all_deposits);
 			(
