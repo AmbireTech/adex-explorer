@@ -270,7 +270,6 @@ fn view(model: &Model) -> Node<Msg> {
             seed::empty()
         },
         ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
-        // ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
     ]
 }
 

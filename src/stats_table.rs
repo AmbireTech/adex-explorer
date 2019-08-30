@@ -8,17 +8,23 @@ use types::{MarketChannel, MarketStatusType};
 
 pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
 	let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
-	let active = channels
-		.iter()
-		.filter(|x| x.status.status_type == MarketStatusType::Active);
-	for channel in active {
+	let mut units_by_type_all = HashMap::<&str, Vec<&MarketChannel>>::new();
+	for channel in channels {
 		for unit in channel.spec.ad_units.iter() {
-			units_by_type
+			if channel.status.status_type == MarketStatusType::Active {
+				units_by_type
+					.entry(&unit.ad_type)
+					.or_insert(vec![])
+					.push(channel);
+			}
+
+			units_by_type_all
 				.entry(&unit.ad_type)
 				.or_insert(vec![])
 				.push(channel);
 		}
 	}
+
 	let units_by_type_stats = units_by_type
 		.iter()
 		.map(|(ad_type, all)| {
