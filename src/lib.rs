@@ -22,7 +22,7 @@ const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
 const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
-// const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
+const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
 const REFRESH_MS: i32 = 30000;
 
 // Data structs specific to the market
@@ -189,9 +189,12 @@ impl ActionLoad {
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
                 let market_uri = format!(
-                    "{}/analytics/{}?timeframe=hour&limit=168",
+                    "{}/channel/{}/events-aggregates/{}?timeframe=hour&limit=168",
                     MARKET_URL,
                     &id,
+                    // @TODO get rid of this default earner thing, it's very very temporary	
+                    // we should get an aggr of all earners	
+                    DEFAULT_EARNER
                 );
                 // @TODO
             }
