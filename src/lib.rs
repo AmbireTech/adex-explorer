@@ -1,10 +1,11 @@
 #[macro_use]
 extern crate seed;
 
+mod types;
+
 use std::collections::HashMap;
 
-use adex_domain::{AdUnit, BigNum, Channel, ChannelSpec};
-use chrono::serde::ts_milliseconds;
+use adex_domain::{AdUnit, BigNum, Channel};
 use chrono::{DateTime, Utc};
 use lazysort::*;
 use num_format::{Locale, ToFormattedString};
@@ -13,6 +14,7 @@ use seed::{Method, Request};
 use seed::fetch;
 use serde::Deserialize;
 use std::collections::HashSet;
+use types::{MarketStatusType, MarketChannel};
 
 const MARKET_URL: &str = "https://market.adex.network";
 const VOLUME_URL: &str = "https://tom.adex.network/volume";
@@ -24,47 +26,6 @@ const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
 const REFRESH_MS: i32 = 30000;
-
-// Data structs specific to the market
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MarketStatusType {
-    Initializing,
-    Ready,
-    Active,
-    Offline,
-    Disconnected,
-    Unhealthy,
-    Withdraw,
-    Expired,
-    Exhausted,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct MarketStatus {
-    #[serde(rename = "name")]
-    pub status_type: MarketStatusType,
-    pub usd_estimate: f32,
-    #[serde(rename = "lastApprovedBalances")]
-    pub balances: HashMap<String, BigNum>,
-    #[serde(with = "ts_milliseconds")]
-    pub last_checked: DateTime<Utc>,
-}
-impl MarketStatus {
-    fn balances_sum(&self) -> BigNum {
-        self.balances.iter().map(|(_, v)| v).sum()
-    }
-}
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct MarketChannel {
-    pub id: String,
-    pub creator: String,
-    pub deposit_asset: String,
-    pub deposit_amount: BigNum,
-    pub status: MarketStatus,
-    pub spec: ChannelSpec,
-}
 
 // Volume response from the validator
 #[derive(Deserialize, Clone, Debug)]
@@ -101,6 +62,7 @@ enum ChannelSort {
     Status,
     Created,
 }
+
 impl Default for ChannelSort {
     fn default() -> Self {
         ChannelSort::Deposit
