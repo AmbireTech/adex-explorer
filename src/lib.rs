@@ -342,24 +342,29 @@ fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeRes
 
 fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Node<Msg> {
     let header = tr![
-        td!["URL"],
-        td!["USD estimate"],
-        td!["Deposit"],
-        td!["CPM"],
-        td!["Paid"],
-        td!["Paid - %"],
-        //td!["Max impressions"],
-        td!["Status"],
-        td!["Created"],
-        //td!["Last updated"],
-        td!["Preview"]
+        th!["URL"],
+        th!["USD estimate"],
+        th!["Deposit"],
+        th!["CPM"],
+        th!["Paid"],
+        th!["Paid - %"],
+        //th!["Max impressions"],
+        th!["Status"],
+        th!["Created"],
+        //th!["Last updated"],
+        th!["Preview"]
     ];
 
-    let channels = std::iter::once(header)
-        .chain(channels.iter().map(|c| channel(last_loaded, c)))
+    let channels = channels
+        .iter()
+        .map(|c| channel(last_loaded, c))
         .collect::<Vec<Node<Msg>>>();
 
-    table![channels]
+    table![
+        class!["table", "is-striped", "is-hoverable", "is-bordered"],
+        thead![header],
+        tbody![channels]
+    ]
 }
 
 fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
