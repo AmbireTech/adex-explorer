@@ -9,16 +9,10 @@ h2.impressions-rainbow {
 body {
   font-family: Arial;
 }
-table {
-  margin-bottom: 1em;
-}
-table td {
-  padding: 0.5em 1.5em; 
-}
-table tr.not-recent {
+.table tr.not-recent {
   background-color: #fa8b8b;
 }
-table tr:first-child {
+.table thead tr th {
   background-color: rgb(27, 117, 188);
   color: white;
 }
@@ -27,7 +21,7 @@ a {
 }
 table tr.full {
   background-color: rgb(20, 220, 157);
-}
+} 
 .card {
   background-color: #efefef;
   padding: 1em;
