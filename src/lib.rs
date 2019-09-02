@@ -247,13 +247,15 @@ fn view(model: &Model) -> Node<Msg> {
         // Tables
         if model.load_action == ActionLoad::Channels {
             div![
+                div![
+                class!["select", "is-primary", "is-large"],
                 select![
                     attrs! {At::Value => "deposit"},
                     option![attrs! {At::Value => "deposit"}, "Sort by deposit"],
                     option![attrs! {At::Value => "status"}, "Sort by status"],
                     option![attrs! {At::Value => "created"}, "Sort by created"],
                     input_ev(Ev::Input, Msg::SortSelected)
-                ],
+                ]],
                 channel_table(
                     model.last_loaded,
                     &channels_dai
