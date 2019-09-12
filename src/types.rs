@@ -50,6 +50,7 @@ impl Default for ChannelSort {
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MarketStatusType {
     Initializing,
+    Waiting,
     Ready,
     Active,
     Offline,
