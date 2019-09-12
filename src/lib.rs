@@ -1,18 +1,21 @@
 #[macro_use]
 extern crate seed;
 
-use std::collections::HashMap;
+mod stats_table;
+mod types;
 
-use adex_domain::{AdUnit, BigNum, Channel, ChannelSpec};
-use chrono::serde::ts_milliseconds;
+use adex_domain::{AdUnit, BigNum, Channel};
 use chrono::{DateTime, Utc};
 use lazysort::*;
 use num_format::{Locale, ToFormattedString};
+use seed::fetch;
 use seed::prelude::*;
 use seed::{Method, Request};
-use seed::fetch;
-use serde::Deserialize;
+use stats_table::ad_unit_stats_table;
 use std::collections::HashSet;
+use types::{ChannelSort, EtherscanBalResp, Loadable, MarketChannel, VolumeResp};
+
+use Loadable::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const VOLUME_URL: &str = "https://tom.adex.network/volume";
@@ -25,87 +28,6 @@ const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
 const REFRESH_MS: i32 = 30000;
 
-// Data structs specific to the market
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MarketStatusType {
-    Initializing,
-    Ready,
-    Active,
-    Offline,
-    Disconnected,
-    Unhealthy,
-    Withdraw,
-    Expired,
-    Exhausted,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct MarketStatus {
-    #[serde(rename = "name")]
-    pub status_type: MarketStatusType,
-    pub usd_estimate: f32,
-    #[serde(rename = "lastApprovedBalances")]
-    pub balances: HashMap<String, BigNum>,
-    #[serde(with = "ts_milliseconds")]
-    pub last_checked: DateTime<Utc>,
-}
-impl MarketStatus {
-    fn balances_sum(&self) -> BigNum {
-        self.balances.iter().map(|(_, v)| v).sum()
-    }
-}
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct MarketChannel {
-    pub id: String,
-    pub creator: String,
-    pub deposit_asset: String,
-    pub deposit_amount: BigNum,
-    pub status: MarketStatus,
-    pub spec: ChannelSpec,
-}
-
-// Volume response from the validator
-#[derive(Deserialize, Clone, Debug)]
-struct VolumeResp {
-    pub aggr: Vec<VolDataPoint>,
-}
-#[derive(Deserialize, Clone, Debug)]
-struct VolDataPoint {
-    pub value: BigNum,
-    pub time: DateTime<Utc>,
-}
-
-// Etherscan API
-#[derive(Deserialize, Clone, Debug)]
-struct EtherscanBalResp {
-    pub result: BigNum,
-}
-
-// Model
-enum Loadable<T> {
-    Loading,
-    Ready(T),
-}
-impl<T> Default for Loadable<T> {
-    fn default() -> Self {
-        Loadable::Loading
-    }
-}
-use Loadable::*;
-
-#[derive(Clone, Copy)]
-enum ChannelSort {
-    Deposit,
-    Status,
-    Created,
-}
-impl Default for ChannelSort {
-    fn default() -> Self {
-        ChannelSort::Deposit
-    }
-}
 // @TODO can we derive this automatically
 impl From<String> for ChannelSort {
     fn from(sort_name: String) -> Self {
@@ -119,7 +41,7 @@ impl From<String> for ChannelSort {
 }
 
 #[derive(Default)]
-struct Model {
+pub struct Model {
     pub load_action: ActionLoad,
     pub sort: ChannelSort,
     // Market channels & balance: for the summaries page
@@ -134,7 +56,7 @@ struct Model {
 
 // Update
 #[derive(Clone, PartialEq, Debug)]
-enum ActionLoad {
+pub enum ActionLoad {
     // The summary includes latest campaigns on the market,
     // and some on-chain data (e.g. DAI balance on core SC)
     Summary,
@@ -148,6 +70,7 @@ impl Default for ActionLoad {
         ActionLoad::Summary
     }
 }
+
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut impl Orders<Msg>) {
         match self {
@@ -203,7 +126,7 @@ impl ActionLoad {
 }
 
 #[derive(Clone)]
-enum Msg {
+pub enum Msg {
     Load(ActionLoad),
     Refresh,
     BalanceLoaded(fetch::ResponseDataResult<EtherscanBalResp>),
@@ -238,7 +161,7 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::VolumeLoaded(Err(reason)) => log!("VolumeLoaded error:", reason),
         Msg::ImpressionsLoaded(Ok(vol)) => model.impressions = Ready(vol),
         Msg::ImpressionsLoaded(Err(reason)) => log!("ImpressionsLoaded error:", reason),
-        Msg::SortSelected(sort_name) => model.sort = sort_name.into()
+        Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
     }
 }
 
@@ -284,32 +207,40 @@ fn view(model: &Model) -> Node<Msg> {
         volume_card(
             "Monthly impressions",
             match &model.impressions {
-                Ready(vol) => Ready(vol.aggr
-                    .iter()
-                    .map(|x| &x.value)
-                    .sum::<BigNum>()
-                    .to_u64()
-                    .unwrap_or(0)
-                    .to_formatted_string(&Locale::en)),
-                Loading => Loading
+                Ready(vol) => Ready(
+                    vol.aggr
+                        .iter()
+                        .map(|x| &x.value)
+                        .sum::<BigNum>()
+                        .to_u64()
+                        .unwrap_or(0)
+                        .to_formatted_string(&Locale::en)
+                ),
+                Loading => Loading,
             },
             &model.impressions
         ),
         br![],
-        card("Total campaign deposits", Ready(dai_readable(&total_deposit))),
+        card(
+            "Total campaign deposits",
+            Ready(dai_readable(&total_deposit))
+        ),
         card("Paid out", Ready(dai_readable(&total_paid))),
         a![
             attrs! { At::Href => format!("https://etherscan.io/address/{}#tokentxns", CORE_ADDR) },
-            card("Locked up on-chain", match &model.balance {
-                Ready(resp) => Ready(dai_readable(&resp.result)),
-                Loading => Loading
-            }),
+            card(
+                "Locked up on-chain",
+                match &model.balance {
+                    Ready(resp) => Ready(dai_readable(&resp.result)),
+                    Loading => Loading,
+                }
+            ),
         ],
         volume_card(
             "24h volume",
             match &model.volume {
                 Ready(vol) => Ready(dai_readable(&vol.aggr.iter().map(|x| &x.value).sum())),
-                Loading => Loading
+                Loading => Loading,
             },
             &model.volume
         ),
@@ -396,7 +327,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
 fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> Node<Msg> {
     let (card_value, vol) = match (&val, vol) {
         (Ready(val), Ready(vol)) => (val, vol),
-        _ => return card(card_label, Loading)
+        _ => return card(card_label, Loading),
     };
     match volume_chart(vol) {
         Some(chart) => div![
@@ -487,46 +418,6 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
     ]
 }
 
-fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
-    let mut units_by_type = HashMap::<&str, Vec<&MarketChannel>>::new();
-    let active = channels.iter().filter(|x| x.status.status_type == MarketStatusType::Active);
-    for channel in active {
-        for unit in channel.spec.ad_units.iter() {
-            units_by_type
-                .entry(&unit.ad_type)
-                .or_insert(vec![])
-                .push(channel);
-        }
-    }
-    let units_by_type_stats = units_by_type
-        .iter()
-        .map(|(ad_type, all)| {
-            let total_per_impression: BigNum = all.iter().map(|x| &x.spec.min_per_impression).sum();
-            // @TODO needs weighted avg
-            let avg_per_impression = total_per_impression.div_floor(&(all.len() as u64).into());
-            let total_vol: BigNum = all.iter().map(|x| &x.deposit_amount - &x.status.balances_sum()).sum();
-            (ad_type, avg_per_impression, total_vol)
-        })
-        .sorted_by(|x, y| y.1.cmp(&x.1))
-        .collect::<Vec<_>>();
-
-    let header = tr![td!["Ad Size"], td!["CPM"], td!["Active volume"],];
-
-    table![std::iter::once(header)
-        .chain(
-            units_by_type_stats
-                .iter()
-                .map(|(ad_type, avg_per_impression, total_vol)| {
-                    tr![
-                        td![ad_type],
-                        td![dai_readable(&(avg_per_impression * &1000.into()))],
-                        td![dai_readable(&total_vol)],
-                    ]
-                })
-        )
-        .collect::<Vec<Node<Msg>>>()]
-}
-
 fn unit_preview(unit: &AdUnit) -> Node<Msg> {
     if unit.media_mime.starts_with("video/") {
         video![
@@ -578,13 +469,17 @@ fn routes(url: seed::Url) -> Msg {
 
 #[wasm_bindgen]
 pub fn render() {
-    let state = seed::App::build(|url, orders| {
-        orders.send_msg(routes(url));
-        Model::default()
-    }, update, view)
-        .routes(routes)
-        .finish()
-        .run();
+    let state = seed::App::build(
+        |url, orders| {
+            orders.send_msg(routes(url));
+            Model::default()
+        },
+        update,
+        view,
+    )
+    .routes(routes)
+    .finish()
+    .run();
 
     seed::set_interval(Box::new(move || state.update(Msg::Refresh)), REFRESH_MS);
 }
