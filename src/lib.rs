@@ -13,13 +13,13 @@ use seed::prelude::*;
 use seed::{Method, Request};
 use stats_table::ad_unit_stats_table;
 use std::collections::HashSet;
-use types::{ChannelSort, EtherscanBalResp, Loadable, MarketChannel, VolumeResp};
+use types::{ChannelSort, EtherscanBalResp, Loadable, MarketChannel, AnalyticsResp};
 
 use Loadable::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
-const VOLUME_URL: &str = "https://tom.adex.network/volume";
-const IMPRESSIONS_URL: &str = "https://tom.adex.network/volume/monthly-impressions";
+const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts&timeframe=day";
+const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
@@ -47,8 +47,8 @@ pub struct Model {
     // Market channels & balance: for the summaries page
     pub market_channels: Loadable<Vec<MarketChannel>>,
     pub balance: Loadable<EtherscanBalResp>,
-    pub volume: Loadable<VolumeResp>,
-    pub impressions: Loadable<VolumeResp>,
+    pub volume: Loadable<AnalyticsResp>,
+    pub impressions: Loadable<AnalyticsResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -99,7 +99,7 @@ impl ActionLoad {
 
                 // Load volume
                 orders.perform_cmd(
-                    Request::new(String::from(VOLUME_URL))
+                    Request::new(String::from(DAILY_VOL_URL))
                         .method(Method::Get)
                         .fetch_json_data(Msg::VolumeLoaded),
                 );
@@ -131,8 +131,8 @@ pub enum Msg {
     Refresh,
     BalanceLoaded(fetch::ResponseDataResult<EtherscanBalResp>),
     ChannelsLoaded(fetch::ResponseDataResult<Vec<MarketChannel>>),
-    VolumeLoaded(fetch::ResponseDataResult<VolumeResp>),
-    ImpressionsLoaded(fetch::ResponseDataResult<VolumeResp>),
+    VolumeLoaded(fetch::ResponseDataResult<AnalyticsResp>),
+    ImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     SortSelected(String),
 }
 
@@ -284,7 +284,7 @@ fn card(label: &str, value: Loadable<String>) -> Node<Msg> {
     ]
 }
 
-fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
+fn volume_chart(vol: &AnalyticsResp) -> Option<Node<Msg>> {
     let values = vol.aggr.iter().map(|x| &x.value);
     let min = values.clone().min()?;
     let max = values.clone().max()?;
@@ -324,7 +324,7 @@ fn volume_chart(vol: &VolumeResp) -> Option<Node<Msg>> {
     ])
 }
 
-fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<VolumeResp>) -> Node<Msg> {
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<AnalyticsResp>) -> Node<Msg> {
     let (card_value, vol) = match (&val, vol) {
         (Ready(val), Ready(vol)) => (val, vol),
         _ => return card(card_label, Loading),
