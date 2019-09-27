@@ -7,12 +7,13 @@ use serde::Deserialize;
 
 // Volume response from the validator
 #[derive(Deserialize, Clone, Debug)]
-pub struct VolumeResp {
-    pub aggr: Vec<VolDataPoint>,
+pub struct AnalyticsResp {
+    pub aggr: Vec<AnalyticsDataPoint>,
 }
 #[derive(Deserialize, Clone, Debug)]
-pub struct VolDataPoint {
+pub struct AnalyticsDataPoint {
     pub value: BigNum,
+    #[serde(with = "ts_milliseconds")]
     pub time: DateTime<Utc>,
 }
 
