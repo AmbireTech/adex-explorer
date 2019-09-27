@@ -15,7 +15,7 @@ use serde::Deserialize;
 use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
-const ANALYTICS_URL: &str = "https://tom.adex.network/analytics";
+const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts";
 const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
@@ -176,9 +176,9 @@ impl ActionLoad {
 
                 // Load analytics
                 orders.perform_cmd(
-                    Request::new(String::from(ANALYTICS_URL))
+                    Request::new(String::from(DAILY_VOL_URL))
                         .method(Method::Get)
-                        .fetch_json_data(Msg::AnalyticsLoaded),
+                        .fetch_json_data(Msg::DailyVolLoaded),
                 );
                 orders.perform_cmd(
                     Request::new(String::from(IMPRESSIONS_URL))
@@ -208,7 +208,7 @@ enum Msg {
     Refresh,
     BalanceLoaded(fetch::ResponseDataResult<EtherscanBalResp>),
     ChannelsLoaded(fetch::ResponseDataResult<Vec<MarketChannel>>),
-    AnalyticsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
+    DailyVolLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     ImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     SortSelected(String),
 }
@@ -234,8 +234,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
             model.last_loaded = (js_sys::Date::now() as i64) / 1000;
         }
         Msg::ChannelsLoaded(Err(reason)) => log!("ChannelsLoaded error:", reason),
-        Msg::AnalyticsLoaded(Ok(analytics)) => model.analytics = Ready(analytics),
-        Msg::AnalyticsLoaded(Err(reason)) => log!("AnalyticsLoaded error:", reason),
+        Msg::DailyVolLoaded(Ok(analytics)) => model.analytics = Ready(analytics),
+        Msg::DailyVolLoaded(Err(reason)) => log!("DailyVolLoaded error:", reason),
         Msg::ImpressionsLoaded(Ok(analytics)) => model.impressions = Ready(analytics),
         Msg::ImpressionsLoaded(Err(reason)) => log!("ImpressionsLoaded error:", reason),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into()
