@@ -15,8 +15,8 @@ use serde::Deserialize;
 use std::collections::HashSet;
 
 const MARKET_URL: &str = "https://market.adex.network";
-const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts";
-const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?timeframe=month";
+const DAILY_VOL_URL: &str = "http://127.0.0.1:8005/analytics?metric=eventPayouts&timeframe=day";
+const IMPRESSIONS_URL: &str = "http://127.0.0.1:8005/analytics?timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
@@ -74,6 +74,7 @@ struct AnalyticsResp {
 #[derive(Deserialize, Clone, Debug)]
 struct AnalyticsDataPoint {
     pub value: BigNum,
+    #[serde(with = "ts_milliseconds")]
     pub time: DateTime<Utc>,
 }
 
