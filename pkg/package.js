@@ -732,7 +732,7 @@ __exports.__wbg_new_7884206509213d02 = function(arg0, arg1) {
         }
 
     };
-    cbarg0.f = wasm.__wbg_function_table.get(408);
+    cbarg0.f = wasm.__wbg_function_table.get(387);
     cbarg0.a = arg0;
     cbarg0.b = arg1;
     try {
@@ -878,9 +878,9 @@ __exports.__wbindgen_throw = function(ptr, len) {
     throw new Error(getStringFromWasm(ptr, len));
 };
 
-__exports.__wbindgen_closure_wrapper280 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(70);
-    const d = wasm.__wbg_function_table.get(71);
+__exports.__wbindgen_closure_wrapper281 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(60);
+    const d = wasm.__wbg_function_table.get(61);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
@@ -902,9 +902,9 @@ __exports.__wbindgen_closure_wrapper280 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper282 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(74);
-    const d = wasm.__wbg_function_table.get(71);
+__exports.__wbindgen_closure_wrapper283 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(64);
+    const d = wasm.__wbg_function_table.get(61);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
@@ -926,9 +926,9 @@ __exports.__wbindgen_closure_wrapper282 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper876 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(318);
-    const d = wasm.__wbg_function_table.get(319);
+__exports.__wbindgen_closure_wrapper829 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(297);
+    const d = wasm.__wbg_function_table.get(298);
     const cb = function() {
         this.cnt++;
         let a = this.a;
@@ -950,9 +950,9 @@ __exports.__wbindgen_closure_wrapper876 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper878 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(318);
-    const d = wasm.__wbg_function_table.get(319);
+__exports.__wbindgen_closure_wrapper831 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(297);
+    const d = wasm.__wbg_function_table.get(298);
     const cb = function() {
         this.cnt++;
         try {
@@ -971,9 +971,9 @@ real.original = cb;
 return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper1290 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(382);
-    const d = wasm.__wbg_function_table.get(383);
+__exports.__wbindgen_closure_wrapper1243 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(361);
+    const d = wasm.__wbg_function_table.get(362);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
