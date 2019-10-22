@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-seed = "^0.4.0"
+seed = "^0.4.1"
 wasm-bindgen = "^0.2.42"
 web-sys = "^0.3.19"
 serde = { version = "^1.0.85", features = ['derive'] }
