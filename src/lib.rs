@@ -385,14 +385,17 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
             attrs! {At::Href => url; At::Target => "_blank"},
             id_prefix
         ]],
-        td![format!("${:.2}", &channel.status.usd_estimate)],
+        td![match channel.status.usd_estimate.as_ref() {
+            Some(usd_estimate) => format!("${:.2}", &usd_estimate),
+            None => "N/A".to_string(),
+        }],
         td![dai_readable(deposit_amount)],
         td![dai_readable(
             &(&channel.spec.min_per_impression * &1000.into())
         )],
         td![dai_readable(&paid_total)],
         td![{
-            let base = 100000_u64;
+            let base = 100_000_u64;
             let paid_units = (&paid_total * &base.into()).div_floor(deposit_amount);
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)
@@ -439,7 +442,7 @@ fn to_http_url(url: &str) -> String {
 fn time_diff(now_seconds: i64, t: &DateTime<Utc>) -> String {
     let time_diff = now_seconds - t.timestamp();
     match time_diff {
-        x if x < 0 => format!("just now"),
+        x if x < 0 => "just now".to_string(),
         x if x < 60 => format!("{} seconds ago", x),
         x if x < 3600 => format!("{} minutes ago", x / 60),
         x if x < 86400 => format!("{} hours ago", x / 3600),
