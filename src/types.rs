@@ -67,7 +67,7 @@ pub enum MarketStatusType {
 pub struct MarketStatus {
     #[serde(rename = "name")]
     pub status_type: MarketStatusType,
-    pub usd_estimate: f32,
+    pub usd_estimate: Option<f32>,
     #[serde(rename = "lastApprovedBalances")]
     pub balances: HashMap<String, BigNum>,
     #[serde(with = "ts_milliseconds")]
