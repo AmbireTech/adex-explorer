@@ -395,7 +395,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
         )],
         td![dai_readable(&paid_total)],
         td![{
-            let base = 100000_u64;
+            let base = 100_000_u64;
             let paid_units = (&paid_total * &base.into()).div_floor(deposit_amount);
             let paid_hundreds = paid_units.to_f64().unwrap_or(base as f64) / (base as f64 / 100.0);
             format!("{:.3}%", paid_hundreds)

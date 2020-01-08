@@ -19,7 +19,7 @@ pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
         .fold(
             HashMap::<&str, Vec<&MarketChannel>>::new(),
             |mut by_type, (ad_type, channel)| {
-                by_type.entry(&ad_type).or_insert(Vec::new()).push(channel);
+                by_type.entry(&ad_type).or_insert_with(Vec::new).push(channel);
 
                 by_type
             },
