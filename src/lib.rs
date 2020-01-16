@@ -23,7 +23,7 @@ const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCo
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
-const DAI_ADDR: &str = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
+const DAI_ADDR: &str = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
 const CORE_ADDR: &str = "0x333420fc6a897356e69b62417cd17ff012177d2b";
 const DEFAULT_EARNER: &str = "0xb7d3f81e857692d13e9d63b232a90f4a1793189e";
 const REFRESH_MS: i32 = 30000;
@@ -90,7 +90,6 @@ impl ActionLoad {
                 );
 
                 // Load campaigns from the market
-                // @TODO request DAI channels only
                 orders.perform_cmd(
                     Request::new(format!("{}/campaigns?all", MARKET_URL))
                         .method(Method::Get)
@@ -173,8 +172,9 @@ fn view(model: &Model) -> Node<Msg> {
     };
 
     let channels_dai = channels
-        .iter()
-        .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
+        .iter();
+        // disabled cause of the SAI to DAI migration
+        // .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
 
     let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
     let total_deposit = channels_dai
