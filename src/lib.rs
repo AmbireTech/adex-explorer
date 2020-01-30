@@ -194,7 +194,8 @@ fn view(model: &Model) -> Node<Msg> {
             x.status
                 .balances
                 .keys()
-                .filter(|k| **k != x.creator)
+                .map(|k| k.to_lowercase())
+                .filter(|k| *k != x.creator.to_lowercase())
                 .collect::<Vec<_>>()
         })
         .collect::<HashSet<_>>();
