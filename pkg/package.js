@@ -878,9 +878,9 @@ __exports.__wbindgen_throw = function(ptr, len) {
     throw new Error(getStringFromWasm(ptr, len));
 };
 
-__exports.__wbindgen_closure_wrapper226 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(43);
-    const d = wasm.__wbg_function_table.get(44);
+__exports.__wbindgen_closure_wrapper225 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(41);
+    const d = wasm.__wbg_function_table.get(42);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
@@ -902,9 +902,9 @@ __exports.__wbindgen_closure_wrapper226 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper228 = function(a, b, _ignored) {
-    const f = wasm.__wbg_function_table.get(47);
-    const d = wasm.__wbg_function_table.get(44);
+__exports.__wbindgen_closure_wrapper227 = function(a, b, _ignored) {
+    const f = wasm.__wbg_function_table.get(45);
+    const d = wasm.__wbg_function_table.get(42);
     const cb = function(arg0) {
         this.cnt++;
         let a = this.a;
@@ -926,7 +926,7 @@ __exports.__wbindgen_closure_wrapper228 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper833 = function(a, b, _ignored) {
+__exports.__wbindgen_closure_wrapper840 = function(a, b, _ignored) {
     const f = wasm.__wbg_function_table.get(299);
     const d = wasm.__wbg_function_table.get(300);
     const cb = function() {
@@ -950,7 +950,7 @@ __exports.__wbindgen_closure_wrapper833 = function(a, b, _ignored) {
     return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper834 = function(a, b, _ignored) {
+__exports.__wbindgen_closure_wrapper841 = function(a, b, _ignored) {
     const f = wasm.__wbg_function_table.get(299);
     const d = wasm.__wbg_function_table.get(300);
     const cb = function() {
@@ -971,7 +971,7 @@ real.original = cb;
 return addHeapObject(real);
 };
 
-__exports.__wbindgen_closure_wrapper1257 = function(a, b, _ignored) {
+__exports.__wbindgen_closure_wrapper1264 = function(a, b, _ignored) {
     const f = wasm.__wbg_function_table.get(358);
     const d = wasm.__wbg_function_table.get(359);
     const cb = function(arg0) {
