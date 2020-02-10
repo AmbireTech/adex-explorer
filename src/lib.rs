@@ -13,14 +13,13 @@ use seed::prelude::*;
 use seed::{Method, Request};
 use stats_table::ad_unit_stats_table;
 use std::collections::HashSet;
-use types::{AnalyticsResp, ChannelSort, EtherscanBalResp, Loadable, MarketChannel};
+use types::{ChannelSort, EtherscanBalResp, Loadable, MarketChannel, AnalyticsResp};
 
 use Loadable::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts&timeframe=day";
-const IMPRESSIONS_URL: &str =
-    "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
+const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
@@ -172,9 +171,10 @@ fn view(model: &Model) -> Node<Msg> {
         Ready(c) => c,
     };
 
-    let channels_dai = channels.iter();
-    // disabled cause of the SAI to DAI migration
-    // .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
+    let channels_dai = channels
+        .iter();
+        // disabled cause of the SAI to DAI migration
+        // .filter(|MarketChannel { deposit_asset, .. }| deposit_asset == DAI_ADDR);
 
     let total_paid = channels_dai.clone().map(|x| x.status.balances_sum()).sum();
     let total_deposit = channels_dai
@@ -204,12 +204,13 @@ fn view(model: &Model) -> Node<Msg> {
         .clone()
         .map(|x| x.creator.to_lowercase())
         .collect::<HashSet<_>>();
-
+ 
     div![
         // Cards
         card("Campaigns", Ready(channels.len().to_string())),
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
+        card("Advertisers", Ready(unique_advertisers.len().to_string())),
         volume_card(
             "Monthly impressions",
             match &model.impressions {
@@ -330,11 +331,7 @@ fn volume_chart(vol: &AnalyticsResp) -> Option<Node<Msg>> {
     ])
 }
 
-fn volume_card(
-    card_label: &str,
-    val: Loadable<String>,
-    vol: &Loadable<AnalyticsResp>,
-) -> Node<Msg> {
+fn volume_card(card_label: &str, val: Loadable<String>, vol: &Loadable<AnalyticsResp>) -> Node<Msg> {
     let (card_value, vol) = match (&val, vol) {
         (Ready(val), Ready(vol)) => (val, vol),
         _ => return card(card_label, Loading),
