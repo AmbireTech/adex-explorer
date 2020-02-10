@@ -200,11 +200,17 @@ fn view(model: &Model) -> Node<Msg> {
         })
         .collect::<HashSet<_>>();
 
+    let unique_advertisers = channels_dai
+        .clone()
+        .map(|x| x.creator.to_lowercase())
+        .collect::<HashSet<_>>();
+ 
     div![
         // Cards
         card("Campaigns", Ready(channels.len().to_string())),
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
+        card("Advertisers", Ready(unique_advertisers.len().to_string())),
         volume_card(
             "Monthly impressions",
             match &model.impressions {
