@@ -277,6 +277,20 @@ fn view(model: &Model) -> Node<Msg> {
             seed::empty()
         },
         ad_unit_stats_table(&channels_dai.clone().collect::<Vec<_>>()),
+        a![
+            attrs! { At::Href => "https://platform.adex.network/#/"},
+            div![
+                class!["button"],
+                "Go to platform"
+            ]
+        ],
+        a![
+            attrs! { At::Href => "https://www.adex.network/"},
+            div![
+                class!["button"],
+                "Go to website"
+            ]
+        ]
     ]
 }
 
