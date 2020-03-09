@@ -36,6 +36,14 @@ table tr.full {
   font-weight: bold;
   color: rgb(27, 117, 188);
 }
+.button {
+  background-color: rgb(27, 117, 188);
+  padding: 1em;
+  margin: 0.5em;
+  display: inline-block;
+  font-weight: bold;
+  color: #efefef;
+}
 .card-label {
   font-size: 1em;
   position: relative;
