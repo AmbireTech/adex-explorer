@@ -52,6 +52,7 @@ impl Default for ChannelSort {
 pub enum MarketStatusType {
     Initializing,
     Waiting,
+    Invalid,
     Ready,
     Active,
     Offline,
