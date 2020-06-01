@@ -266,7 +266,10 @@ fn view(model: &Model) -> Node<Msg> {
                     model.last_loaded,
                     &channels_dai
                         .clone()
-                        .filter(|channel| model.load_action == ActionLoad::ChannelsAll || channel.status.status_type != types::MarketStatusType::Expired)
+                        .filter(|channel| model.load_action == ActionLoad::ChannelsAll || match channel.status.status_type {
+                            types::MarketStatusType::Expired | types::MarketStatusType::Exhausted => false,
+                            _ => true
+                        })
                         .sorted_by(|x, y| match model.sort {
                             ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
                             ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
