@@ -398,7 +398,7 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
     // stuff will be not-recent until we get the latest status
     tr![
         class!(
-            if last_loaded - channel.status.last_checked.timestamp() > 180 {
+            if last_loaded - channel.status.last_checked.timestamp() > 360 {
                 "not-recent"
             } else {
                 "recent"
