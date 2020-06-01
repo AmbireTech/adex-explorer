@@ -61,7 +61,8 @@ pub enum ActionLoad {
     // and some on-chain data (e.g. DAI balance on core SC)
     Summary,
     // Channels will show the summary plus the channels
-    Channels,
+    ChannelsActive,
+    ChannelsAll,
     // The channel detail contains a summary of what validator knows about a channel
     ChannelDetail(String),
 }
@@ -74,7 +75,7 @@ impl Default for ActionLoad {
 impl ActionLoad {
     fn perform_effects(&self, orders: &mut impl Orders<Msg>) {
         match self {
-            ActionLoad::Summary | ActionLoad::Channels => {
+            ActionLoad::Summary | ActionLoad::ChannelsActive | ActionLoad::ChannelsAll => {
                 // Load on-chain balances
                 let etherscan_uri = format!(
                     "{}?module=account&action=tokenbalance&contractAddress={}&address={}&tag=latest&apikey={}",
@@ -252,7 +253,7 @@ fn view(model: &Model) -> Node<Msg> {
             &model.volume
         ),
         // Tables
-        if model.load_action == ActionLoad::Channels {
+        if model.load_action == ActionLoad::ChannelsActive || model.load_action == ActionLoad::ChannelsAll {
             div![
                 select![
                     attrs! {At::Value => "deposit"},
@@ -265,6 +266,7 @@ fn view(model: &Model) -> Node<Msg> {
                     model.last_loaded,
                     &channels_dai
                         .clone()
+                        .filter(|channel| model.load_action == ActionLoad::ChannelsAll || channel.status.status_type != types::MarketStatusType::Expired)
                         .sorted_by(|x, y| match model.sort {
                             ChannelSort::Deposit => y.deposit_amount.cmp(&x.deposit_amount),
                             ChannelSort::Status => x.status.status_type.cmp(&y.status.status_type),
@@ -482,7 +484,8 @@ fn dai_readable(bal: &BigNum) -> String {
 // Router
 fn routes(url: seed::Url) -> Msg {
     match url.path.get(0).map(|x| x.as_ref()) {
-        Some("channels") => Msg::Load(ActionLoad::Channels),
+        Some("channels") => Msg::Load(ActionLoad::ChannelsActive),
+        Some("channels-all") => Msg::Load(ActionLoad::ChannelsAll),
         Some("channel") => match url.path.get(1) {
             Some(id) => Msg::Load(ActionLoad::ChannelDetail(id.to_string())),
             None => Msg::Load(ActionLoad::Summary),
