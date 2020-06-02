@@ -19,6 +19,7 @@ use Loadable::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts&timeframe=day";
+const DAILY_IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
 const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
@@ -49,6 +50,7 @@ pub struct Model {
     pub balance: Loadable<EtherscanBalResp>,
     pub volume: Loadable<AnalyticsResp>,
     pub impressions: Loadable<AnalyticsResp>,
+    pub daily_impressions: Loadable<AnalyticsResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -108,6 +110,11 @@ impl ActionLoad {
                         .method(Method::Get)
                         .fetch_json_data(Msg::ImpressionsLoaded),
                 );
+                orders.perform_cmd(
+                    Request::new(String::from(DAILY_IMPRESSIONS_URL))
+                        .method(Method::Get)
+                        .fetch_json_data(Msg::DailyImpressionsLoaded),
+                );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
@@ -133,6 +140,7 @@ pub enum Msg {
     ChannelsLoaded(fetch::ResponseDataResult<Vec<MarketChannel>>),
     VolumeLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     ImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
+    DailyImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     SortSelected(String),
 }
 
@@ -159,8 +167,10 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::ChannelsLoaded(Err(reason)) => log!("ChannelsLoaded error:", reason),
         Msg::VolumeLoaded(Ok(vol)) => model.volume = Ready(vol),
         Msg::VolumeLoaded(Err(reason)) => log!("VolumeLoaded error:", reason),
-        Msg::ImpressionsLoaded(Ok(vol)) => model.impressions = Ready(vol),
+        Msg::ImpressionsLoaded(Ok(impressions)) => model.impressions = Ready(impressions),
         Msg::ImpressionsLoaded(Err(reason)) => log!("ImpressionsLoaded error:", reason),
+        Msg::DailyImpressionsLoaded(Ok(impressions)) => model.daily_impressions = Ready(impressions),
+        Msg::DailyImpressionsLoaded(Err(reason)) => log!("DailyImpressionsLoaded error:", reason),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
     }
 }
@@ -212,22 +222,8 @@ fn view(model: &Model) -> Node<Msg> {
         card("Ad units", Ready(unique_units.len().to_string())),
         card("Publishers", Ready(unique_publishers.len().to_string())),
         card("Advertisers", Ready(unique_advertisers.len().to_string())),
-        volume_card(
-            "Monthly impressions",
-            match &model.impressions {
-                Ready(vol) => Ready(
-                    vol.aggr
-                        .iter()
-                        .map(|x| &x.value)
-                        .sum::<BigNum>()
-                        .to_u64()
-                        .unwrap_or(0)
-                        .to_formatted_string(&Locale::en)
-                ),
-                Loading => Loading,
-            },
-            &model.impressions
-        ),
+        impressions_card("Monthly impressions", &model.impressions),
+        impressions_card("Daily impressions", &model.daily_impressions),
         br![],
         card(
             "Total campaign deposits",
@@ -297,6 +293,25 @@ fn view(model: &Model) -> Node<Msg> {
             ]
         ]
     ]
+}
+
+fn impressions_card(title: &str, loadable: &types::Loadable<AnalyticsResp>) -> Node<Msg> {
+    volume_card(
+        title,
+        match loadable {
+            Ready(vol) => Ready(
+                vol.aggr
+                    .iter()
+                    .map(|x| &x.value)
+                    .sum::<BigNum>()
+                    .to_u64()
+                    .unwrap_or(0)
+                    .to_formatted_string(&Locale::en)
+            ),
+            Loading => Loading,
+        },
+        loadable
+    )
 }
 
 fn card(label: &str, value: Loadable<String>) -> Node<Msg> {
