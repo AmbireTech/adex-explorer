@@ -19,7 +19,7 @@ use Loadable::*;
 
 const MARKET_URL: &str = "https://market.adex.network";
 const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts&timeframe=day";
-const DAILY_IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
+const DAILY_IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=day";
 const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
