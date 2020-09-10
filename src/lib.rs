@@ -21,6 +21,7 @@ const MARKET_URL: &str = "https://market.adex.network";
 const DAILY_VOL_URL: &str = "https://tom.adex.network/analytics?metric=eventPayouts&timeframe=day";
 const DAILY_IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=day";
 const IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=month";
+const YEARLY_IMPRESSIONS_URL: &str = "https://tom.adex.network/analytics?metric=eventCounts&timeframe=year";
 const ETHERSCAN_URL: &str = "https://api.etherscan.io/api";
 const ETHERSCAN_API_KEY: &str = "CUSGAYGXI4G2EIYN1FKKACBUIQMN5BKR2B";
 const IPFS_GATEWAY: &str = "https://ipfs.adex.network/ipfs/";
@@ -51,6 +52,7 @@ pub struct Model {
     pub volume: Loadable<AnalyticsResp>,
     pub impressions: Loadable<AnalyticsResp>,
     pub daily_impressions: Loadable<AnalyticsResp>,
+    pub yearly_impressions: Loadable<AnalyticsResp>,
     // Current selected channel: for ChannelDetail
     pub channel: Loadable<Channel>,
     pub last_loaded: i64,
@@ -115,6 +117,11 @@ impl ActionLoad {
                         .method(Method::Get)
                         .fetch_json_data(Msg::DailyImpressionsLoaded),
                 );
+                orders.perform_cmd(
+                    Request::new(String::from(YEARLY_IMPRESSIONS_URL))
+                        .method(Method::Get)
+                        .fetch_json_data(Msg::YearlyImpressionsLoaded),
+                );
             }
             // NOTE: not used yet
             ActionLoad::ChannelDetail(id) => {
@@ -141,6 +148,7 @@ pub enum Msg {
     VolumeLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     ImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     DailyImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
+    YearlyImpressionsLoaded(fetch::ResponseDataResult<AnalyticsResp>),
     SortSelected(String),
 }
 
@@ -171,6 +179,8 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::ImpressionsLoaded(Err(reason)) => log!("ImpressionsLoaded error:", reason),
         Msg::DailyImpressionsLoaded(Ok(impressions)) => model.daily_impressions = Ready(impressions),
         Msg::DailyImpressionsLoaded(Err(reason)) => log!("DailyImpressionsLoaded error:", reason),
+        Msg::YearlyImpressionsLoaded(Ok(impressions)) => model.yearly_impressions = Ready(impressions),
+        Msg::YearlyImpressionsLoaded(Err(reason)) => log!("YearlyImpressionsLoaded error:", reason),
         Msg::SortSelected(sort_name) => model.sort = sort_name.into(),
     }
 }
@@ -248,6 +258,8 @@ fn view(model: &Model) -> Node<Msg> {
             },
             &model.volume
         ),
+        br![],
+        impressions_card("Yearly impressions (transactions)", &model.yearly_impressions),
         // Tables
         if model.load_action == ActionLoad::ChannelsActive || model.load_action == ActionLoad::ChannelsAll {
             div![
