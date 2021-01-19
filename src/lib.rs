@@ -398,7 +398,7 @@ fn channel_table(last_loaded: i64, channels: &[&MarketChannel]) -> Node<Msg> {
         td!["URL"],
         td!["USD estimate"],
         td!["Deposit"],
-        td!["CPM"],
+        // td!["CPM"],
         td!["Paid"],
         td!["Paid - %"],
         //td!["Max impressions"],
@@ -443,9 +443,9 @@ fn channel(last_loaded: i64, channel: &MarketChannel) -> Node<Msg> {
             None => "N/A".to_string(),
         }],
         td![dai_readable(deposit_amount)],
-        td![dai_readable(
-            &(&channel.spec.min_per_impression * &1000.into())
-        )],
+        //td![dai_readable(
+        //    &(&channel.spec.min_per_impression * &1000.into())
+        //)],
         td![dai_readable(&paid_total)],
         td![{
             let base = 100_000_u64;
