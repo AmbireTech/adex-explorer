@@ -66,7 +66,7 @@ pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
 
     let header = tr![
         td!["Ad Size"],
-        td!["Current CPM"],
+        //td!["Current CPM"],
         td!["Active volume"],
         td!["Total volume"]
     ];
@@ -80,7 +80,7 @@ pub fn ad_unit_stats_table(channels: &[&MarketChannel]) -> Node<Msg> {
                     |(ad_type, avg_weighted_per_impression, total_active_vol, total_vol)| {
                         tr![
                             td![ad_type],
-                            td![dai_readable(&(avg_weighted_per_impression * &1000.into()))],
+                            //td![dai_readable(&(avg_weighted_per_impression * &1000.into()))],
                             td![dai_readable(&total_active_vol)],
                             td![dai_readable(&total_vol)],
                         ]
